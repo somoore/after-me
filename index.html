@@ -4410,7 +4410,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
         <div class="drop-icon">📂</div>
         <div>Drop GEDCOM file here</div>
         <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Supports Ancestry, FamilySearch, MyHeritage exports</div>
-        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip,application/zip,application/x-zip-compressed,*/*">
+        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip">
       </div>
       <div class="or-divider">or</div>
       <button class="btn-start-new" id="startNew">Start New Tree</button>
@@ -5603,16 +5603,28 @@ class FamilyTreeApp {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
-    dropZone.addEventListener('click', () => fileInput.click());
+    // Click handler for desktop and mobile
+    dropZone.addEventListener('click', (e) => {
+      // Don't trigger if clicking directly on the file input
+      if (e.target === fileInput) return;
+      e.preventDefault();
+      fileInput.click();
+    });
+    
     dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
     dropZone.addEventListener('drop', e => {
       e.preventDefault();
       dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) this.loadFile(e.dataTransfer.files[0]);
+      if (e.dataTransfer && e.dataTransfer.files[0]) this.loadFile(e.dataTransfer.files[0]);
     });
     fileInput.addEventListener('change', e => {
-      if (e.target.files[0]) this.loadFile(e.target.files[0]);
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        this.loadFile(file);
+        // Reset input to allow re-selecting the same file
+        fileInput.value = '';
+      }
     });
 
     document.getElementById('startNew').addEventListener('click', () => {
@@ -5749,6 +5761,11 @@ class FamilyTreeApp {
   }
 
   async loadFile(file) {
+    if (!file || !file.size) {
+      this.toast('Error: No file selected or file is empty');
+      return;
+    }
+    
     this.showLoading('Reading file...');
     try {
       let text;
@@ -5760,6 +5777,10 @@ class FamilyTreeApp {
       } else {
         text = await this.readText(file);
       }
+      
+      if (!text || !text.trim()) {
+        throw new Error('File appears to be empty');
+      }
 
       this.showLoading('Parsing GEDCOM...');
       const parsed = this.parser.parse(text);
@@ -5767,13 +5788,21 @@ class FamilyTreeApp {
       this.data = parsed.friendly;
       this.meta = parsed.meta;
 
+      const individualCount = Object.keys(this.data.individuals).length;
+      
+      if (individualCount === 0) {
+        this.toast('Warning: No people found in file. Is this a valid GEDCOM?');
+        this.hideLoading();
+        return;
+      }
+      
       this.showLoading('Building visualization...');
       this.buildGraph();
       this.hideWelcome();
-      this.toast(`Loaded ${Object.keys(this.data.individuals).length} people`);
+      this.toast(`Loaded ${individualCount} people`);
     } catch (e) {
       console.error('Error loading file:', e);
-      this.toast('Error: ' + e.message);
+      this.toast('Error: ' + (e.message || 'Unknown error loading file'));
     }
     this.hideLoading();
   }
@@ -5782,20 +5811,32 @@ class FamilyTreeApp {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(new Uint8Array(reader.result));
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file.slice(0, 4));
+      reader.onerror = () => reject(new Error('Failed to read file header'));
+      try {
+        reader.readAsArrayBuffer(file.slice(0, 4));
+      } catch (e) {
+        reject(new Error('Failed to read file: ' + e.message));
+      }
     });
   }
 
   async readText(file) {
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
+    const bytes = await this.readAsArrayBuffer(file);
     return this.decodeBytes(bytes);
   }
 
+  // FileReader-based arrayBuffer reading for mobile compatibility
+  readAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result));
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
   async extractZip(file) {
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
+    const bytes = await this.readAsArrayBuffer(file);
 
     if (bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
       throw new Error('Invalid ZIP file');
