@@ -4408,9 +4408,10 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
       <p>Upload a GEDCOM file to visualize your family history</p>
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">📂</div>
-        <div>Drop GEDCOM file here</div>
-        <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Supports Ancestry, FamilySearch, MyHeritage exports</div>
-        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip">
+        <div>Drop .ged or .zip file here</div>
+        <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Supports .ged, .gedcom, and .zip files from Ancestry, FamilySearch, MyHeritage</div>
+        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip,application/zip,application/x-zip-compressed,text/plain,*/*">
+        <div style="font-size: 0.85rem; color: var(--accent); margin-top: 0.75rem; cursor: pointer;">Click to browse files</div>
       </div>
       <div class="or-divider">or</div>
       <button class="btn-start-new" id="startNew">Start New Tree</button>
@@ -5765,21 +5766,33 @@ class FamilyTreeApp {
       this.toast('Error: No file selected or file is empty');
       return;
     }
-    
-    this.showLoading('Reading file...');
+
+    console.log('Loading file:', file.name, 'size:', file.size, 'type:', file.type);
+    this.showLoading(`Reading ${file.name}...`);
+
     try {
       let text;
       const header = await this.readHeader(file);
-      
+
       // Check for ZIP magic bytes (PK)
-      if (header[0] === 0x50 && header[1] === 0x4B) {
+      const isZip = header[0] === 0x50 && header[1] === 0x4B;
+
+      if (isZip) {
+        this.showLoading('Extracting GEDCOM from ZIP...');
         text = await this.extractZip(file);
       } else {
+        this.showLoading('Reading GEDCOM file...');
         text = await this.readText(file);
       }
-      
+
       if (!text || !text.trim()) {
         throw new Error('File appears to be empty');
+      }
+
+      // Basic validation that this looks like GEDCOM data
+      const firstLine = text.trim().split(/\r?\n/)[0];
+      if (!firstLine.match(/^0\s+(HEAD|@)/i)) {
+        throw new Error('File does not appear to be a valid GEDCOM file. Expected to start with "0 HEAD"');
       }
 
       this.showLoading('Parsing GEDCOM...');
@@ -5789,17 +5802,17 @@ class FamilyTreeApp {
       this.meta = parsed.meta;
 
       const individualCount = Object.keys(this.data.individuals).length;
-      
+
       if (individualCount === 0) {
         this.toast('Warning: No people found in file. Is this a valid GEDCOM?');
         this.hideLoading();
         return;
       }
-      
+
       this.showLoading('Building visualization...');
       this.buildGraph();
       this.hideWelcome();
-      this.toast(`Loaded ${individualCount} people`);
+      this.toast(`Loaded ${individualCount} people from ${isZip ? 'ZIP archive' : 'GEDCOM file'}`);
     } catch (e) {
       console.error('Error loading file:', e);
       this.toast('Error: ' + (e.message || 'Unknown error loading file'));
@@ -5842,57 +5855,143 @@ class FamilyTreeApp {
       throw new Error('Invalid ZIP file');
     }
 
-    // Parse all local file headers to find .ged/.gedcom files
-    const entries = [];
-    let offset = 0;
+    // Helper to read 2-byte little-endian integer
+    const read16 = (arr, off) => arr[off] | (arr[off + 1] << 8);
+    // Helper to read 4-byte little-endian integer
+    const read32 = (arr, off) => arr[off] | (arr[off + 1] << 8) | (arr[off + 2] << 16) | ((arr[off + 3] << 24) >>> 0);
 
-    while (offset < bytes.length - 4) {
-      // Check for local file header signature (PK\x03\x04)
-      if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B &&
-          bytes[offset + 2] === 0x03 && bytes[offset + 3] === 0x04) {
-
-        const method = bytes[offset + 8] | (bytes[offset + 9] << 8);
-        const compSize = bytes[offset + 18] | (bytes[offset + 19] << 8) |
-                        (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
-        const uncompSize = bytes[offset + 22] | (bytes[offset + 23] << 8) |
-                          (bytes[offset + 24] << 16) | (bytes[offset + 25] << 24);
-        const nameLen = bytes[offset + 26] | (bytes[offset + 27] << 8);
-        const extraLen = bytes[offset + 28] | (bytes[offset + 29] << 8);
-        const nameBytes = bytes.slice(offset + 30, offset + 30 + nameLen);
-        const fileName = new TextDecoder().decode(nameBytes);
-        const dataStart = offset + 30 + nameLen + extraLen;
-        const dataSize = compSize > 0 ? compSize : uncompSize;
-
-        entries.push({ fileName, method, dataStart, compSize: dataSize, uncompSize });
-        offset = dataStart + dataSize;
-      } else if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B) {
-        // Other PK signature (central directory, etc.) - stop parsing
+    // Find End of Central Directory record (search from end of file)
+    let eocdOffset = -1;
+    for (let i = bytes.length - 22; i >= 0 && i >= bytes.length - 65557; i--) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x4B &&
+          bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) {
+        eocdOffset = i;
         break;
-      } else {
-        offset++;
       }
     }
 
-    // Find the first .ged or .gedcom file
-    const gedEntry = entries.find(e =>
-      /\.(ged|gedcom)$/i.test(e.fileName) && !e.fileName.startsWith('__MACOSX')
-    ) || entries.find(e => !e.fileName.endsWith('/') && !e.fileName.startsWith('__MACOSX'));
+    const entries = [];
 
-    if (!gedEntry) {
-      throw new Error('No GEDCOM file found in ZIP');
+    if (eocdOffset !== -1) {
+      // Parse central directory for accurate file info
+      const cdOffset = read32(bytes, eocdOffset + 16);
+      const cdEntries = read16(bytes, eocdOffset + 10);
+
+      let offset = cdOffset;
+      for (let i = 0; i < cdEntries && offset < bytes.length - 46; i++) {
+        // Central directory file header signature (PK\x01\x02)
+        if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B &&
+            bytes[offset + 2] === 0x01 && bytes[offset + 3] === 0x02) {
+
+          const method = read16(bytes, offset + 10);
+          const compSize = read32(bytes, offset + 20);
+          const uncompSize = read32(bytes, offset + 24);
+          const nameLen = read16(bytes, offset + 28);
+          const extraLen = read16(bytes, offset + 30);
+          const commentLen = read16(bytes, offset + 32);
+          const localHeaderOffset = read32(bytes, offset + 42);
+
+          const nameBytes = bytes.slice(offset + 46, offset + 46 + nameLen);
+          const fileName = new TextDecoder().decode(nameBytes);
+
+          // Calculate data start from local file header
+          const localNameLen = read16(bytes, localHeaderOffset + 26);
+          const localExtraLen = read16(bytes, localHeaderOffset + 28);
+          const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+
+          entries.push({ fileName, method, dataStart, compSize, uncompSize });
+          offset += 46 + nameLen + extraLen + commentLen;
+        } else {
+          break;
+        }
+      }
     }
 
-    const compData = bytes.slice(gedEntry.dataStart, gedEntry.dataStart + gedEntry.compSize);
+    // Fallback: parse local file headers if central directory parsing failed
+    if (entries.length === 0) {
+      let offset = 0;
+      while (offset < bytes.length - 30) {
+        if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B &&
+            bytes[offset + 2] === 0x03 && bytes[offset + 3] === 0x04) {
+
+          const flags = read16(bytes, offset + 6);
+          const method = read16(bytes, offset + 8);
+          let compSize = read32(bytes, offset + 18);
+          let uncompSize = read32(bytes, offset + 22);
+          const nameLen = read16(bytes, offset + 26);
+          const extraLen = read16(bytes, offset + 28);
+          const nameBytes = bytes.slice(offset + 30, offset + 30 + nameLen);
+          const fileName = new TextDecoder().decode(nameBytes);
+          const dataStart = offset + 30 + nameLen + extraLen;
+
+          // If bit 3 is set, sizes are in data descriptor after data
+          if ((flags & 0x08) && compSize === 0) {
+            // Skip this entry for now - can't reliably parse without size
+            offset++;
+            continue;
+          }
+
+          const dataSize = compSize > 0 ? compSize : uncompSize;
+          if (dataSize > 0) {
+            entries.push({ fileName, method, dataStart, compSize: dataSize, uncompSize });
+            offset = dataStart + dataSize;
+          } else {
+            offset++;
+          }
+        } else if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B) {
+          break;
+        } else {
+          offset++;
+        }
+      }
+    }
+
+    console.log('ZIP entries found:', entries.map(e => e.fileName));
+
+    // Find the first .ged or .gedcom file (skip __MACOSX and directories)
+    const gedEntry = entries.find(e =>
+      /\.(ged|gedcom)$/i.test(e.fileName) &&
+      !e.fileName.startsWith('__MACOSX') &&
+      !e.fileName.includes('/__MACOSX')
+    );
+
+    // Fallback to first non-directory file if no .ged found
+    const fallbackEntry = entries.find(e =>
+      !e.fileName.endsWith('/') &&
+      !e.fileName.startsWith('__MACOSX') &&
+      !e.fileName.includes('/__MACOSX') &&
+      e.compSize > 0
+    );
+
+    const selectedEntry = gedEntry || fallbackEntry;
+
+    if (!selectedEntry) {
+      const fileList = entries.map(e => e.fileName).join(', ') || 'none';
+      throw new Error(`No GEDCOM file found in ZIP. Files in archive: ${fileList}`);
+    }
+
+    console.log('Extracting:', selectedEntry.fileName, 'method:', selectedEntry.method, 'size:', selectedEntry.compSize);
+
+    const compData = bytes.slice(selectedEntry.dataStart, selectedEntry.dataStart + selectedEntry.compSize);
 
     let rawBytes;
-    if (gedEntry.method === 0) {
+    if (selectedEntry.method === 0) {
       // Stored (no compression)
       rawBytes = compData;
-    } else if (gedEntry.method === 8) {
-      // Deflate
-      rawBytes = pako.inflateRaw(compData);
+    } else if (selectedEntry.method === 8) {
+      // Deflate compression
+      try {
+        rawBytes = pako.inflateRaw(compData);
+      } catch (e) {
+        // Some ZIP tools use regular inflate instead of inflateRaw
+        try {
+          rawBytes = pako.inflate(compData);
+        } catch (e2) {
+          throw new Error('Failed to decompress file: ' + e.message);
+        }
+      }
     } else {
-      throw new Error('Unsupported compression method: ' + gedEntry.method);
+      throw new Error('Unsupported compression method: ' + selectedEntry.method);
     }
 
     // Decode with proper encoding detection
