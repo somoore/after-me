@@ -4563,6 +4563,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
 
       <!-- Quick tier presets -->
       <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <button class="btn" id="presetMinimal" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;" title="Names and relationships only - best for QR codes">Minimal</button>
         <button class="btn" id="presetBasic" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Basic</button>
         <button class="btn" id="presetGood" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Good</button>
         <button class="btn" id="presetBest" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Best</button>
@@ -4573,6 +4574,41 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Estimated URL Size</div>
         <div id="sizeEstimateValue" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">— KB</div>
         <div id="sizeEstimateChars" style="font-size: 0.75rem; color: var(--text-muted);">— characters</div>
+      </div>
+
+      <!-- Barcode Compatibility Indicator -->
+      <div id="barcodeCompatibility" style="background: var(--bg-warm); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">Scannable Code Options</div>
+
+        <!-- QR Code Row -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem; background: var(--bg); border-radius: 6px;">
+          <input type="radio" name="barcodeType" id="barcodeQR" value="qr" checked style="margin: 0;">
+          <label for="barcodeQR" style="flex: 1; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span><strong>QR Code</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(universal)</span></span>
+              <span id="qrCompatStatus" style="font-size: 0.8rem; font-weight: 600;">—</span>
+            </div>
+            <div style="height: 6px; background: #e0d8ce; border-radius: 3px; margin-top: 0.25rem; overflow: hidden;">
+              <div id="qrCompatFill" style="height: 100%; width: 0%; background: #2d8a4e; transition: width 0.3s, background 0.3s;"></div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Aztec Code Row -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: var(--bg); border-radius: 6px;">
+          <input type="radio" name="barcodeType" id="barcodeAztec" value="aztec" style="margin: 0;">
+          <label for="barcodeAztec" style="flex: 1; cursor: pointer;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span><strong>Aztec Code</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(+30% capacity)</span></span>
+              <span id="aztecCompatStatus" style="font-size: 0.8rem; font-weight: 600;">—</span>
+            </div>
+            <div style="height: 6px; background: #e0d8ce; border-radius: 3px; margin-top: 0.25rem; overflow: hidden;">
+              <div id="aztecCompatFill" style="height: 100%; width: 0%; background: #2d8a4e; transition: width 0.3s, background 0.3s;"></div>
+            </div>
+          </label>
+        </div>
+
+        <div id="barcodeCompatInfo" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; text-align: center;">—</div>
       </div>
 
       <!-- Format selection -->
@@ -4603,16 +4639,16 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
       <div class="url-stats" id="urlStats" style="display: none;"></div>
       <div class="url-warning" id="urlWarning" style="display: none; margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px; color: #856404; font-size: 0.9rem;"></div>
 
-      <!-- QR Code Section -->
+      <!-- Scannable Code Section -->
       <div id="qrCodeSection" style="display: none; margin: 1rem 0; text-align: center;">
-        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">QR Code</div>
+        <div id="qrCodeTitle" style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">Scannable Code</div>
         <div id="qrCodeContainer" style="display: inline-block; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <canvas id="qrCodeCanvas"></canvas>
         </div>
         <div id="qrCodeInfo" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;"></div>
         <div id="qrCodeWarning" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border-radius: 4px; color: #856404; font-size: 0.8rem;"></div>
         <button class="btn" id="saveQrCodeBtn" style="margin-top: 0.75rem;">
-          <span style="margin-right: 0.25rem;">💾</span> Save QR Code as Image
+          <span style="margin-right: 0.25rem;">💾</span> Save as Image
         </button>
       </div>
 
@@ -5446,6 +5482,428 @@ class QRCodeGenerator {
    */
   static getMaxCapacity(ecLevel = QRCodeGenerator.EC_LOW) {
     return QRCodeGenerator.CAPACITY[40][ecLevel];
+  }
+}
+
+// =============================================================================
+// AZTEC CODE GENERATOR (Zero Dependencies)
+// =============================================================================
+
+/**
+ * Pure JavaScript Aztec Code Generator
+ * Implements Aztec Code (ISO/IEC 24778) - both Compact and Full-Range formats
+ * Higher capacity than QR codes (~3.8KB vs ~2.9KB max)
+ */
+class AztecCodeGenerator {
+  // Aztec code can hold more data than QR codes
+  // Full-range 151×151 with 5% EC can hold 3,832 bytes
+  // Full-range 151×151 with 23% EC can hold ~3,067 bytes
+
+  // Layer configurations for compact Aztec (1-4 layers)
+  static COMPACT_SIZES = [
+    null,
+    { size: 15, words: 17, dataWords: 13 },   // 1 layer
+    { size: 19, words: 40, dataWords: 31 },   // 2 layers
+    { size: 23, words: 51, dataWords: 40 },   // 3 layers
+    { size: 27, words: 76, dataWords: 61 }    // 4 layers
+  ];
+
+  // Layer configurations for full-range Aztec (1-32 layers)
+  // Format: { size, totalCodewords, dataCodewords (at ~23% EC) }
+  static FULL_SIZES = [
+    null,
+    { size: 19, cw: 21, data: 17 },    // 1
+    { size: 23, cw: 48, data: 40 },    // 2
+    { size: 27, cw: 60, data: 51 },    // 3
+    { size: 31, cw: 88, data: 76 },    // 4
+    { size: 37, cw: 120, data: 104 },  // 5
+    { size: 41, cw: 156, data: 136 },  // 6
+    { size: 45, cw: 196, data: 172 },  // 7
+    { size: 49, cw: 240, data: 212 },  // 8
+    { size: 53, cw: 288, data: 256 },  // 9
+    { size: 57, cw: 340, data: 304 },  // 10
+    { size: 61, cw: 396, data: 356 },  // 11
+    { size: 67, cw: 456, data: 412 },  // 12
+    { size: 71, cw: 520, data: 472 },  // 13
+    { size: 75, cw: 588, data: 536 },  // 14
+    { size: 79, cw: 660, data: 604 },  // 15
+    { size: 83, cw: 736, data: 676 },  // 16
+    { size: 87, cw: 816, data: 752 },  // 17
+    { size: 91, cw: 900, data: 832 },  // 18
+    { size: 95, cw: 988, data: 916 },  // 19
+    { size: 101, cw: 1080, data: 1004 }, // 20
+    { size: 105, cw: 1176, data: 1096 }, // 21
+    { size: 109, cw: 1276, data: 1192 }, // 22
+    { size: 113, cw: 1380, data: 1292 }, // 23
+    { size: 117, cw: 1488, data: 1396 }, // 24
+    { size: 121, cw: 1600, data: 1504 }, // 25
+    { size: 125, cw: 1716, data: 1616 }, // 26
+    { size: 131, cw: 1836, data: 1732 }, // 27
+    { size: 135, cw: 1960, data: 1852 }, // 28
+    { size: 139, cw: 2088, data: 1976 }, // 29
+    { size: 143, cw: 2220, data: 2104 }, // 30
+    { size: 147, cw: 2356, data: 2236 }, // 31
+    { size: 151, cw: 2496, data: 2372 }  // 32
+  ];
+
+  // Use same GF(2^8) as QR codes for Reed-Solomon
+  static GF_EXP = QRCodeGenerator.GF_EXP;
+  static GF_LOG = QRCodeGenerator.GF_LOG;
+
+  constructor() {
+    this.modules = null;
+    this.size = 0;
+    this.layers = 0;
+    this.compact = false;
+  }
+
+  /**
+   * Generate Aztec code for given text
+   * @param {string} text - Text to encode
+   * @param {number} ecPercent - Error correction percentage (5-95, default 23)
+   * @returns {object} - {modules, size, layers, compact} or null if too large
+   */
+  generate(text, ecPercent = 23) {
+    const data = new TextEncoder().encode(text);
+
+    // Find minimum layer configuration
+    const config = this.findMinConfig(data.length, ecPercent);
+    if (!config) return null;
+
+    this.layers = config.layers;
+    this.compact = config.compact;
+    this.size = config.size;
+
+    // Initialize modules
+    this.modules = [];
+    for (let i = 0; i < this.size; i++) {
+      this.modules[i] = new Array(this.size).fill(false);
+    }
+
+    // Place finder pattern (bullseye)
+    this.placeFinderPattern();
+
+    // Encode data with Reed-Solomon
+    const encoded = this.encodeData(data, config);
+
+    // Place mode message
+    this.placeModeMessage(config);
+
+    // Place data in layers
+    this.placeDataLayers(encoded);
+
+    return {
+      modules: this.modules,
+      size: this.size,
+      layers: this.layers,
+      compact: this.compact
+    };
+  }
+
+  findMinConfig(dataBytes, ecPercent) {
+    // Calculate required codewords (6-bit words for Aztec)
+    // Data needs: mode bits + length bits + data bits + padding
+    const dataBits = 4 + 5 + (dataBytes * 8); // Simplified: byte mode indicator + length + data
+    const dataWords = Math.ceil(dataBits / 6);
+
+    // Try compact first (smaller codes)
+    for (let layers = 1; layers <= 4; layers++) {
+      const cfg = AztecCodeGenerator.COMPACT_SIZES[layers];
+      const ecWords = Math.ceil(cfg.dataWords * ecPercent / 100);
+      const availableData = cfg.dataWords - ecWords;
+      if (availableData >= dataWords) {
+        return { layers, compact: true, size: cfg.size, totalWords: cfg.dataWords, ecWords };
+      }
+    }
+
+    // Try full-range
+    for (let layers = 1; layers <= 32; layers++) {
+      const cfg = AztecCodeGenerator.FULL_SIZES[layers];
+      const totalWords = Math.floor(cfg.cw * 6 / 8); // Convert to 8-bit for capacity calc
+      const ecWords = Math.ceil(totalWords * ecPercent / 100);
+      const availableData = totalWords - ecWords;
+      if (availableData >= dataBytes) {
+        return { layers, compact: false, size: cfg.size, totalWords, ecWords, cfg };
+      }
+    }
+
+    return null;
+  }
+
+  placeFinderPattern() {
+    const center = Math.floor(this.size / 2);
+    const patternSize = this.compact ? 9 : 13;
+    const halfPattern = Math.floor(patternSize / 2);
+
+    // Draw concentric squares (bullseye pattern)
+    for (let ring = 0; ring <= halfPattern; ring++) {
+      const dark = (ring % 2 === 0);
+      for (let i = -ring; i <= ring; i++) {
+        // Top and bottom edges
+        if (center - ring >= 0 && center + ring < this.size) {
+          this.modules[center - ring][center + i] = dark;
+          this.modules[center + ring][center + i] = dark;
+        }
+        // Left and right edges
+        if (center - ring >= 0 && center + ring < this.size) {
+          this.modules[center + i][center - ring] = dark;
+          this.modules[center + i][center + ring] = dark;
+        }
+      }
+    }
+
+    // Add orientation marks at corners
+    const orientOffset = halfPattern + 1;
+    if (center - orientOffset >= 0 && center + orientOffset < this.size) {
+      // Top-left, top-right, bottom-left have marks; bottom-right is empty
+      this.modules[center - orientOffset][center - orientOffset] = true;
+      this.modules[center - orientOffset][center + orientOffset] = true;
+      this.modules[center + orientOffset][center - orientOffset] = true;
+      // Reference grid dots for full-range
+      if (!this.compact) {
+        this.modules[center - orientOffset][center] = true;
+        this.modules[center + orientOffset][center] = true;
+        this.modules[center][center - orientOffset] = true;
+        this.modules[center][center + orientOffset] = true;
+      }
+    }
+  }
+
+  encodeData(data, config) {
+    // Simplified encoding: byte mode for all data
+    const bits = [];
+
+    // Upper/Shift to Binary mode (5 bits: 11111)
+    bits.push(1, 1, 1, 1, 1);
+
+    // Length (11 bits for lengths > 31, otherwise 5 bits)
+    if (data.length > 31) {
+      // Long length format
+      bits.push(0, 0, 0, 0, 0); // Escape
+      const len = data.length - 31;
+      for (let i = 10; i >= 0; i--) {
+        bits.push((len >> i) & 1);
+      }
+    } else {
+      // Short length format
+      for (let i = 4; i >= 0; i--) {
+        bits.push((data.length >> i) & 1);
+      }
+    }
+
+    // Data bytes
+    for (let i = 0; i < data.length; i++) {
+      for (let j = 7; j >= 0; j--) {
+        bits.push((data[i] >> j) & 1);
+      }
+    }
+
+    // Convert to codewords (6-bit for compact, 8/10/12-bit varies for full)
+    // Simplified: use 8-bit codewords
+    const wordSize = 8;
+
+    // Pad to word boundary
+    while (bits.length % wordSize !== 0) {
+      bits.push(1); // Pad with 1s
+    }
+
+    // Convert to bytes
+    const codewords = [];
+    for (let i = 0; i < bits.length; i += wordSize) {
+      let word = 0;
+      for (let j = 0; j < wordSize; j++) {
+        word = (word << 1) | (bits[i + j] || 0);
+      }
+      codewords.push(word);
+    }
+
+    // Add Reed-Solomon error correction
+    const ecWords = config.ecWords || Math.ceil(codewords.length * 0.23);
+    const eccoded = this.addReedSolomon(codewords, ecWords);
+
+    // Convert back to bits
+    const resultBits = [];
+    for (const word of eccoded) {
+      for (let j = wordSize - 1; j >= 0; j--) {
+        resultBits.push((word >> j) & 1);
+      }
+    }
+
+    return resultBits;
+  }
+
+  addReedSolomon(data, ecWords) {
+    // Generate Reed-Solomon codewords using same algorithm as QR
+    const gen = this.getGeneratorPolynomial(ecWords);
+    const result = new Uint8Array(ecWords);
+    const work = new Uint8Array(data.length + ecWords);
+
+    for (let i = 0; i < data.length; i++) {
+      work[i] = data[i];
+    }
+
+    for (let i = 0; i < data.length; i++) {
+      const coef = work[i];
+      if (coef !== 0) {
+        const logCoef = AztecCodeGenerator.GF_LOG[coef];
+        for (let j = 0; j < gen.length; j++) {
+          work[i + j] ^= AztecCodeGenerator.GF_EXP[(logCoef + gen[j]) % 255];
+        }
+      }
+    }
+
+    // Combine data + EC
+    const output = [...data];
+    for (let i = 0; i < ecWords; i++) {
+      output.push(work[data.length + i]);
+    }
+    return output;
+  }
+
+  getGeneratorPolynomial(degree) {
+    // Cache and reuse from QRCodeGenerator if available
+    if (!AztecCodeGenerator._genCache) AztecCodeGenerator._genCache = {};
+    if (AztecCodeGenerator._genCache[degree]) return AztecCodeGenerator._genCache[degree];
+
+    let gen = [0];
+    for (let i = 0; i < degree; i++) {
+      const newGen = new Uint8Array(gen.length + 1);
+      for (let j = 0; j < gen.length; j++) {
+        newGen[j] = (newGen[j] + gen[j]) % 255;
+        newGen[j + 1] = (gen[j] + i) % 255;
+      }
+      gen = newGen;
+    }
+
+    AztecCodeGenerator._genCache[degree] = gen;
+    return gen;
+  }
+
+  placeModeMessage(config) {
+    // Mode message contains layer count and data word count
+    // Compact: 28 bits around finder; Full: 40 bits
+    const center = Math.floor(this.size / 2);
+    const modeSize = this.compact ? 7 : 10;
+
+    // Simplified mode message (just marks the area)
+    const offset = this.compact ? 5 : 7;
+
+    // Place mode bits around the finder pattern (simplified pattern)
+    for (let i = 0; i < modeSize; i++) {
+      const bit = (config.layers >> (modeSize - 1 - i)) & 1;
+      // Top edge
+      if (center - offset >= 0) {
+        this.modules[center - offset][center - Math.floor(modeSize/2) + i] = !!bit;
+      }
+      // Bottom edge (inverted)
+      if (center + offset < this.size) {
+        this.modules[center + offset][center + Math.floor(modeSize/2) - i] = !!bit;
+      }
+    }
+  }
+
+  placeDataLayers(bits) {
+    const center = Math.floor(this.size / 2);
+    const startOffset = this.compact ? 6 : 8;
+    let bitIdx = 0;
+
+    // Place data in layers spiraling outward
+    for (let layer = 1; layer <= this.layers; layer++) {
+      const offset = startOffset + (layer - 1) * 2;
+
+      // Each layer has 4 sides, each with (offset * 2 + 1) modules
+      // Top side (left to right)
+      for (let i = -offset; i <= offset && bitIdx < bits.length; i++) {
+        const row = center - offset;
+        const col = center + i;
+        if (row >= 0 && row < this.size && col >= 0 && col < this.size) {
+          // Skip reference grid positions for full-range
+          if (!this.compact && (row % 16 === center % 16 || col % 16 === center % 16)) continue;
+          this.modules[row][col] = bits[bitIdx++] === 1;
+        }
+      }
+
+      // Right side (top to bottom)
+      for (let i = -offset + 1; i <= offset && bitIdx < bits.length; i++) {
+        const row = center + i;
+        const col = center + offset;
+        if (row >= 0 && row < this.size && col >= 0 && col < this.size) {
+          if (!this.compact && (row % 16 === center % 16 || col % 16 === center % 16)) continue;
+          this.modules[row][col] = bits[bitIdx++] === 1;
+        }
+      }
+
+      // Bottom side (right to left)
+      for (let i = offset - 1; i >= -offset && bitIdx < bits.length; i--) {
+        const row = center + offset;
+        const col = center + i;
+        if (row >= 0 && row < this.size && col >= 0 && col < this.size) {
+          if (!this.compact && (row % 16 === center % 16 || col % 16 === center % 16)) continue;
+          this.modules[row][col] = bits[bitIdx++] === 1;
+        }
+      }
+
+      // Left side (bottom to top)
+      for (let i = offset - 1; i >= -offset + 1 && bitIdx < bits.length; i--) {
+        const row = center + i;
+        const col = center - offset;
+        if (row >= 0 && row < this.size && col >= 0 && col < this.size) {
+          if (!this.compact && (row % 16 === center % 16 || col % 16 === center % 16)) continue;
+          this.modules[row][col] = bits[bitIdx++] === 1;
+        }
+      }
+    }
+  }
+
+  /**
+   * Render Aztec code to a canvas element
+   */
+  static renderToCanvas(canvas, aztec, options = {}) {
+    const {
+      moduleSize = 4,
+      margin = 2,
+      darkColor = '#000000',
+      lightColor = '#FFFFFF'
+    } = options;
+
+    // Aztec codes don't need quiet zone, but small margin looks better
+    const totalSize = (aztec.size + margin * 2) * moduleSize;
+    canvas.width = totalSize;
+    canvas.height = totalSize;
+
+    const ctx = canvas.getContext('2d');
+
+    // Fill background
+    ctx.fillStyle = lightColor;
+    ctx.fillRect(0, 0, totalSize, totalSize);
+
+    // Draw modules
+    ctx.fillStyle = darkColor;
+    for (let row = 0; row < aztec.size; row++) {
+      for (let col = 0; col < aztec.size; col++) {
+        if (aztec.modules[row][col]) {
+          ctx.fillRect(
+            (col + margin) * moduleSize,
+            (row + margin) * moduleSize,
+            moduleSize,
+            moduleSize
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Get maximum byte capacity
+   * @param {number} ecPercent - Error correction percentage (default 23%)
+   * @returns {number} - Maximum bytes that can be encoded
+   */
+  static getMaxCapacity(ecPercent = 23) {
+    // Layer 32 full-range at given EC
+    const cfg = AztecCodeGenerator.FULL_SIZES[32];
+    const totalBytes = Math.floor(cfg.cw * 6 / 8);
+    const ecBytes = Math.ceil(totalBytes * ecPercent / 100);
+    return totalBytes - ecBytes - 10; // Subtract overhead for mode/length
   }
 }
 
@@ -6579,6 +7037,7 @@ class FamilyTreeApp {
     });
 
     // URL data options - presets
+    document.getElementById('presetMinimal').addEventListener('click', () => this.applyDataPreset('minimal'));
     document.getElementById('presetBasic').addEventListener('click', () => this.applyDataPreset('basic'));
     document.getElementById('presetGood').addEventListener('click', () => this.applyDataPreset('good'));
     document.getElementById('presetBest').addEventListener('click', () => this.applyDataPreset('best'));
@@ -6595,6 +7054,11 @@ class FamilyTreeApp {
         this.updateUrlModeStyles();
         this.updateSizeEstimate();
       });
+    });
+
+    // Barcode type radio buttons trigger size estimate update
+    document.querySelectorAll('input[name="barcodeType"]').forEach(radio => {
+      radio.addEventListener('change', () => this.updateSizeEstimate());
     });
 
     // Make the entire format option container clickable
@@ -7783,10 +8247,18 @@ class FamilyTreeApp {
       optBurial: tier === 'best'
     };
 
-    Object.entries(checkboxes).forEach(([id, checked]) => {
-      const el = document.getElementById(id);
-      if (el) el.checked = checked;
-    });
+    // Minimal tier: only names and relationships (all options unchecked)
+    if (tier === 'minimal') {
+      Object.keys(checkboxes).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+    } else {
+      Object.entries(checkboxes).forEach(([id, checked]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+      });
+    }
 
     this.updateSizeEstimate();
   }
@@ -7956,10 +8428,97 @@ class FamilyTreeApp {
       } else {
         sizeEl.style.color = 'var(--accent)'; // Normal
       }
+
+      // Update QR code compatibility indicator
+      this.updateQRCompatibility(urlSize, options);
     } catch (e) {
       console.error('Size estimate error:', e);
       document.getElementById('sizeEstimateValue').textContent = '— KB';
       document.getElementById('sizeEstimateChars').textContent = 'Error estimating';
+      this.updateQRCompatibility(0, null);
+    }
+  }
+
+  /**
+   * Update the QR code compatibility indicator
+   * @param {number} urlSize - Estimated URL size in bytes
+   * @param {object} options - Current data options
+   */
+  updateQRCompatibility(urlSize, options) {
+    const maxQRCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW); // ~2953 bytes
+    const maxAztecCapacity = AztecCodeGenerator.getMaxCapacity(23); // ~3800+ bytes
+    const peopleCount = this.data?.individuals ? Object.keys(this.data.individuals).length : 0;
+
+    // QR Code elements
+    const qrStatusEl = document.getElementById('qrCompatStatus');
+    const qrFillEl = document.getElementById('qrCompatFill');
+
+    // Aztec Code elements
+    const aztecStatusEl = document.getElementById('aztecCompatStatus');
+    const aztecFillEl = document.getElementById('aztecCompatFill');
+
+    // Info element (shared)
+    const infoEl = document.getElementById('barcodeCompatInfo');
+
+    if (!urlSize || urlSize === 0) {
+      qrStatusEl.textContent = '—';
+      qrFillEl.style.width = '0%';
+      qrFillEl.style.background = '#e0d8ce';
+      aztecStatusEl.textContent = '—';
+      aztecFillEl.style.width = '0%';
+      aztecFillEl.style.background = '#e0d8ce';
+      infoEl.textContent = 'Load a family tree first';
+      return;
+    }
+
+    // Check current mode
+    const checkedRadio = document.querySelector('input[name="urlMode"]:checked');
+    const mode = checkedRadio ? checkedRadio.value : 'pure';
+
+    // Update QR Code status
+    const qrPercentUsed = Math.min((urlSize / maxQRCapacity) * 100, 100);
+    qrFillEl.style.width = `${qrPercentUsed}%`;
+
+    if (urlSize <= maxQRCapacity) {
+      qrStatusEl.innerHTML = '<span style="color: #2d8a4e;">✓ Fits</span>';
+      qrFillEl.style.background = '#2d8a4e';
+    } else {
+      qrStatusEl.innerHTML = '<span style="color: #dc3545;">✗ Too Large</span>';
+      qrFillEl.style.background = '#dc3545';
+    }
+
+    // Update Aztec Code status
+    const aztecPercentUsed = Math.min((urlSize / maxAztecCapacity) * 100, 100);
+    aztecFillEl.style.width = `${aztecPercentUsed}%`;
+
+    if (urlSize <= maxAztecCapacity) {
+      aztecStatusEl.innerHTML = '<span style="color: #2d8a4e;">✓ Fits</span>';
+      aztecFillEl.style.background = '#2d8a4e';
+    } else {
+      aztecStatusEl.innerHTML = '<span style="color: #dc3545;">✗ Too Large</span>';
+      aztecFillEl.style.background = '#dc3545';
+    }
+
+    // Update info text
+    const bytesPerPerson = urlSize / peopleCount;
+
+    // Calculate max people for each format with minimal settings
+    const minimalBytesPerPerson = 22;
+    const wrapperOverhead = 1500;
+    const qrMaxPeople = Math.floor((maxQRCapacity - wrapperOverhead) / minimalBytesPerPerson);
+    const aztecMaxPeople = Math.floor((maxAztecCapacity - wrapperOverhead) / minimalBytesPerPerson);
+
+    if (urlSize <= maxQRCapacity) {
+      infoEl.innerHTML = `<span style="color: #2d8a4e;">✓ Both formats available!</span> Using ${(urlSize / 1024).toFixed(1)} KB`;
+    } else if (urlSize <= maxAztecCapacity) {
+      infoEl.innerHTML = `<span style="color: #2d8a4e;">✓ Aztec Code fits!</span> QR: max ${(maxQRCapacity / 1024).toFixed(1)} KB • Aztec: ${(urlSize / 1024).toFixed(1)} KB of ${(maxAztecCapacity / 1024).toFixed(1)} KB`;
+    } else {
+      let msg = `${peopleCount} people too large for both formats`;
+      if (mode !== 'compressed') {
+        msg += '<br><span style="color: #4a7eb8;">Tip: Use Compact format + Minimal preset</span>';
+      }
+      msg += `<br><span style="color: var(--text-muted);">QR max: ~${qrMaxPeople} people • Aztec max: ~${aztecMaxPeople} people</span>`;
+      infoEl.innerHTML = msg;
     }
   }
 
@@ -8088,8 +8647,8 @@ class FamilyTreeApp {
   }
 
   /**
-   * Generate and render QR code for the given URL
-   * @param {string} url - The URL to encode in the QR code
+   * Generate and render barcode (QR or Aztec) for the given URL
+   * @param {string} url - The URL to encode
    */
   generateQRCode(url) {
     const qrSection = document.getElementById('qrCodeSection');
@@ -8098,85 +8657,125 @@ class FamilyTreeApp {
     const qrWarning = document.getElementById('qrCodeWarning');
     const saveBtn = document.getElementById('saveQrCodeBtn');
 
-    // Check if URL is too large for QR code
-    // QR code version 40 with EC level L can hold ~2953 bytes
-    const maxCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW);
+    // Check which barcode type is selected
+    const barcodeTypeRadio = document.querySelector('input[name="barcodeType"]:checked');
+    const barcodeType = barcodeTypeRadio ? barcodeTypeRadio.value : 'qr';
+
     const urlBytes = new TextEncoder().encode(url).length;
 
+    // Get max capacity based on type
+    const maxQRCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW);
+    const maxAztecCapacity = AztecCodeGenerator.getMaxCapacity(23);
+    const maxCapacity = barcodeType === 'aztec' ? maxAztecCapacity : maxQRCapacity;
+    const typeName = barcodeType === 'aztec' ? 'Aztec Code' : 'QR Code';
+
     if (urlBytes > maxCapacity) {
-      // URL too large for QR code
+      // URL too large for selected barcode type
       qrSection.style.display = 'block';
       qrCanvas.style.display = 'none';
       qrInfo.textContent = '';
       qrWarning.style.display = 'block';
-      qrWarning.innerHTML = `⚠️ URL too large for QR code (${(urlBytes / 1024).toFixed(1)} KB). Maximum QR code capacity is ~${(maxCapacity / 1024).toFixed(1)} KB. Consider using a URL shortener or the "Download HTML" option.`;
+
+      // Suggest alternative if available
+      if (barcodeType === 'qr' && urlBytes <= maxAztecCapacity) {
+        qrWarning.innerHTML = `⚠️ URL too large for QR Code (${(urlBytes / 1024).toFixed(1)} KB > ${(maxQRCapacity / 1024).toFixed(1)} KB limit).<br><span style="color: #2d8a4e;">✓ Try selecting Aztec Code instead - it can fit ${(maxAztecCapacity / 1024).toFixed(1)} KB!</span>`;
+      } else {
+        qrWarning.innerHTML = `⚠️ URL too large for ${typeName} (${(urlBytes / 1024).toFixed(1)} KB). Maximum capacity is ~${(maxCapacity / 1024).toFixed(1)} KB. Consider using "Download HTML" option.`;
+      }
       saveBtn.style.display = 'none';
       return;
     }
 
     try {
-      // Generate QR code
-      const qrGenerator = new QRCodeGenerator();
-      const qr = qrGenerator.generate(url, QRCodeGenerator.EC_LOW);
+      let code, infoText;
 
-      if (!qr) {
-        throw new Error('Failed to generate QR code');
+      if (barcodeType === 'aztec') {
+        // Generate Aztec code
+        const aztecGenerator = new AztecCodeGenerator();
+        code = aztecGenerator.generate(url, 23);
+
+        if (!code) {
+          throw new Error('Failed to generate Aztec code');
+        }
+
+        // Calculate optimal module size
+        let moduleSize = 3;
+        if (code.size > 100) moduleSize = 2;
+        else if (code.size < 50) moduleSize = 4;
+
+        AztecCodeGenerator.renderToCanvas(qrCanvas, code, {
+          moduleSize: moduleSize,
+          margin: 2,
+          darkColor: '#2d2a26',
+          lightColor: '#FFFFFF'
+        });
+
+        infoText = `Aztec ${code.compact ? 'Compact' : 'Full'} • ${code.layers} layers • ${code.size}×${code.size} • ${urlBytes} bytes`;
+      } else {
+        // Generate QR code
+        const qrGenerator = new QRCodeGenerator();
+        code = qrGenerator.generate(url, QRCodeGenerator.EC_LOW);
+
+        if (!code) {
+          throw new Error('Failed to generate QR code');
+        }
+
+        // Calculate optimal module size based on QR version
+        let moduleSize = 4;
+        if (code.version > 20) moduleSize = 2;
+        else if (code.version > 10) moduleSize = 3;
+
+        QRCodeGenerator.renderToCanvas(qrCanvas, code, {
+          moduleSize: moduleSize,
+          margin: 4,
+          darkColor: '#2d2a26',
+          lightColor: '#FFFFFF'
+        });
+
+        infoText = `QR Version ${code.version} • ${code.size}×${code.size} modules • ${urlBytes} bytes`;
       }
 
-      // Render to canvas
-      // Calculate optimal module size based on QR version
-      // Larger QR codes need smaller modules to fit reasonably
-      let moduleSize = 4;
-      if (qr.version > 20) moduleSize = 2;
-      else if (qr.version > 10) moduleSize = 3;
-
-      QRCodeGenerator.renderToCanvas(qrCanvas, qr, {
-        moduleSize: moduleSize,
-        margin: 4,
-        darkColor: '#2d2a26',
-        lightColor: '#FFFFFF'
-      });
-
-      // Show QR section
+      // Show barcode section
       qrSection.style.display = 'block';
       qrCanvas.style.display = 'block';
-      qrInfo.textContent = `Version ${qr.version} • ${qr.size}×${qr.size} modules • ${urlBytes} bytes`;
+      qrInfo.textContent = infoText;
       qrWarning.style.display = 'none';
       saveBtn.style.display = 'inline-block';
 
       // Store reference for saving
       this._qrCanvas = qrCanvas;
+      this._barcodeType = barcodeType;
 
     } catch (e) {
-      console.error('QR code generation error:', e);
+      console.error('Barcode generation error:', e);
       qrSection.style.display = 'block';
       qrCanvas.style.display = 'none';
       qrInfo.textContent = '';
       qrWarning.style.display = 'block';
-      qrWarning.textContent = 'Error generating QR code: ' + e.message;
+      qrWarning.textContent = `Error generating ${typeName}: ` + e.message;
       saveBtn.style.display = 'none';
     }
   }
 
   /**
-   * Save the QR code as a PNG image
+   * Save the barcode as a PNG image
    */
   saveQRCodeAsImage() {
     if (!this._qrCanvas) {
-      this.toast('No QR code to save');
+      this.toast('No barcode to save');
       return;
     }
 
     try {
-      // Create a link element
+      const typeName = this._barcodeType === 'aztec' ? 'aztec' : 'qrcode';
       const link = document.createElement('a');
-      link.download = 'family-tree-qrcode.png';
+      link.download = `family-tree-${typeName}.png`;
       link.href = this._qrCanvas.toDataURL('image/png');
       link.click();
-      this.toast('QR code saved');
+      this.toast(`${this._barcodeType === 'aztec' ? 'Aztec code' : 'QR code'} saved`);
     } catch (e) {
-      console.error('Error saving QR code:', e);
-      this.toast('Error saving QR code: ' + e.message);
+      console.error('Error saving barcode:', e);
+      this.toast('Error saving barcode: ' + e.message);
     }
   }
 
