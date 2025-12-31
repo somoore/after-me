@@ -7118,12 +7118,9 @@ ${treeHtml}
       }))
     };
 
-    // Use pako.deflateRaw with level 9 for maximum compression
-    // The viewer uses native DecompressionStream which can decompress any deflate stream
+    // Compress using native CompressionStream (deflate-raw format)
     const jsonData = JSON.stringify(treeData);
-    const jsonBytes = new TextEncoder().encode(jsonData);
-    const compressed = pako.deflateRaw(jsonBytes, { level: 9 });
-    const base64Data = b64urlEncode(compressed);
+    const base64Data = await compressToB64url(jsonData);
 
     // Self-contained HTML viewer using native DecompressionStream
     // No CDN, no external dependencies - works offline forever
