@@ -8665,18 +8665,22 @@ class FamilyTreeApp {
 
     if (urlBytes > maxCapacity) {
       // URL too large for selected barcode type
-      qrSection.style.display = 'block';
-      qrCanvas.style.display = 'none';
-      qrInfo.textContent = '';
-      qrWarning.style.display = 'block';
 
-      // Suggest alternative if available
-      if (barcodeType === 'qr' && urlBytes <= maxAztecCapacity) {
-        qrWarning.innerHTML = `⚠️ URL too large for QR Code (${(urlBytes / 1024).toFixed(1)} KB > ${(maxQRCapacity / 1024).toFixed(1)} KB limit).<br><span style="color: #2d8a4e;">✓ Try selecting Aztec Code instead - it can fit ${(maxAztecCapacity / 1024).toFixed(1)} KB!</span>`;
-      } else {
-        qrWarning.innerHTML = `⚠️ URL too large for ${typeName} (${(urlBytes / 1024).toFixed(1)} KB). Maximum capacity is ~${(maxCapacity / 1024).toFixed(1)} KB. Consider using "Download HTML" option.`;
+      // If URL is too large for BOTH formats, hide the section entirely
+      if (urlBytes > maxQRCapacity && urlBytes > maxAztecCapacity) {
+        qrSection.style.display = 'none';
+        return;
       }
-      saveBtn.style.display = 'none';
+
+      // Show suggestion to switch to Aztec if it can handle the URL
+      if (barcodeType === 'qr' && urlBytes <= maxAztecCapacity) {
+        qrSection.style.display = 'block';
+        qrCanvas.style.display = 'none';
+        qrInfo.textContent = '';
+        qrWarning.style.display = 'block';
+        qrWarning.innerHTML = `⚠️ URL too large for QR Code (${(urlBytes / 1024).toFixed(1)} KB > ${(maxQRCapacity / 1024).toFixed(1)} KB limit).<br><span style="color: #2d8a4e;">✓ Try selecting Aztec Code instead - it can fit ${(maxAztecCapacity / 1024).toFixed(1)} KB!</span>`;
+        saveBtn.style.display = 'none';
+      }
       return;
     }
 
