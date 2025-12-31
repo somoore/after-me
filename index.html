@@ -4480,33 +4480,125 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
 
   <!-- URL Modal -->
   <div class="modal" id="urlModal">
-    <div class="modal-content">
-      <h2>🔗 Share</h2>
+    <div class="modal-content" style="max-width: 600px;">
+      <h2>🔗 Share as URL</h2>
       <p style="color: var(--text-muted); margin-bottom: 1rem;">The URL IS the artifact. Works forever, with zero internet required.</p>
-      
-      <!-- Archive format selection -->
+
+      <!-- Data Options Table -->
       <div style="margin-bottom: 1rem;">
-        <label style="display: block; padding: 0.75rem; border: 2px solid var(--accent); border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s; background: rgba(139, 90, 60, 0.05);" id="urlModeMaxLabel">
-          <input type="radio" name="urlMode" id="urlModeMax" value="pure" checked style="margin-right: 0.5rem;">
-          <strong>🏆 Maximum Compatibility</strong> <span style="color: var(--accent); font-size: 0.8rem;">(Recommended)</span>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.5rem;">
-            ✓ Works FOREVER with zero dependencies<br>
-            ✓ No JavaScript, no internet required<br>
-            ✓ Nested tree view with CSS styling
-          </div>
-        </label>
-        <label style="display: block; padding: 0.75rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s;" id="urlModeCompactLabel">
-          <input type="radio" name="urlMode" id="urlModeCompact" value="compressed" style="margin-right: 0.5rem;">
-          <strong>Compact</strong> <span style="color: var(--text-muted); font-size: 0.8rem;">(Smaller URL)</span>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.5rem;">
-            ~30% smaller URL • Searchable list view<br>
-            ⚠️ Requires JavaScript + internet on first load
-          </div>
-        </label>
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">Choose what to include:</div>
+        <table id="dataOptionsTable" style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+          <thead>
+            <tr style="background: var(--bg-warm); border-bottom: 2px solid var(--border);">
+              <th style="padding: 0.5rem; text-align: left; width: 40%;">Data</th>
+              <th style="padding: 0.5rem; text-align: center; width: 20%;">
+                <span style="color: #666;">Basic</span>
+              </th>
+              <th style="padding: 0.5rem; text-align: center; width: 20%;">
+                <span style="color: #4a7eb8;">Good</span>
+              </th>
+              <th style="padding: 0.5rem; text-align: center; width: 20%;">
+                <span style="color: #2d8a4e;">Best</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Names</td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" id="optNames" checked disabled title="Always included"></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Relationships</td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" id="optRelationships" checked disabled title="Always included"></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Birth/Death Years</td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optYears" data-tier="basic" checked></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Full Dates (day/month)</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optFullDates" data-tier="good" checked></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Places</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optPlaces" data-tier="good" checked></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Marriage Dates</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optMarriage" data-tier="good" checked></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Sex/Gender</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optSex" data-tier="good" checked></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: var(--accent);">✓</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Occupation</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optOccupation" data-tier="best"></td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem;">Burial Info</td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><span style="color: #999;">—</span></td>
+              <td style="padding: 0.5rem; text-align: center;"><input type="checkbox" class="data-option" id="optBurial" data-tier="best"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Quick tier presets -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <button class="btn" id="presetBasic" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Basic</button>
+        <button class="btn" id="presetGood" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Good</button>
+        <button class="btn" id="presetBest" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Best</button>
+      </div>
+
+      <!-- Live size estimate -->
+      <div id="sizeEstimate" style="background: var(--bg-warm); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; text-align: center;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Estimated URL Size</div>
+        <div id="sizeEstimateValue" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">— KB</div>
+        <div id="sizeEstimateChars" style="font-size: 0.75rem; color: var(--text-muted);">— characters</div>
+      </div>
+
+      <!-- Format selection -->
+      <div style="margin-bottom: 1rem;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">URL Format:</div>
+        <div style="display: flex; gap: 0.5rem;">
+          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--accent); border-radius: 8px; cursor: pointer; transition: all 0.2s; background: rgba(139, 90, 60, 0.05); text-align: center;" id="urlModeMaxLabel">
+            <input type="radio" name="urlMode" id="urlModeMax" value="pure" checked style="margin-right: 0.25rem;">
+            <strong>Pure HTML</strong>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">No JS needed</div>
+          </label>
+          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeCompactLabel">
+            <input type="radio" name="urlMode" id="urlModeCompact" value="compressed" style="margin-right: 0.25rem;">
+            <strong>Compact</strong>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">~30% smaller</div>
+          </label>
+          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeTextLabel">
+            <input type="radio" name="urlMode" id="urlModeText" value="text" style="margin-right: 0.25rem;">
+            <strong>Text Only</strong>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">Plain text</div>
+          </label>
+        </div>
       </div>
 
       <button class="btn btn-primary" id="generateUrlBtn" style="width: 100%; margin-bottom: 1rem;">Generate URL</button>
-      
+
       <div class="url-output" id="urlOutput" style="display: none;"></div>
       <div class="url-stats" id="urlStats" style="display: none;"></div>
       <div class="url-warning" id="urlWarning" style="display: none; margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px; color: #856404; font-size: 0.9rem;"></div>
@@ -5761,6 +5853,24 @@ class FamilyTreeApp {
       }
     });
 
+    // URL data options - presets
+    document.getElementById('presetBasic').addEventListener('click', () => this.applyDataPreset('basic'));
+    document.getElementById('presetGood').addEventListener('click', () => this.applyDataPreset('good'));
+    document.getElementById('presetBest').addEventListener('click', () => this.applyDataPreset('best'));
+
+    // URL data options - checkboxes trigger size estimate
+    document.querySelectorAll('.data-option').forEach(cb => {
+      cb.addEventListener('change', () => this.updateSizeEstimate());
+    });
+
+    // URL mode radio buttons trigger size estimate and label styling
+    document.querySelectorAll('input[name="urlMode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        this.updateUrlModeStyles();
+        this.updateSizeEstimate();
+      });
+    });
+
     document.querySelectorAll('.modal').forEach(m => {
       m.addEventListener('click', e => { if (e.target === m) this.closeModal(m.id); });
     });
@@ -6904,21 +7014,284 @@ class FamilyTreeApp {
     document.getElementById('urlCloseOnly').style.display = 'flex';
     document.getElementById('generateUrlBtn').style.display = 'block';
     document.getElementById('urlModal').classList.add('show');
+
+    // Update size estimate when modal opens
+    this.updateUrlModeStyles();
+    this.updateSizeEstimate();
+  }
+
+  // Apply a data tier preset (basic, good, best)
+  applyDataPreset(tier) {
+    const checkboxes = {
+      optYears: tier === 'basic' || tier === 'good' || tier === 'best',
+      optFullDates: tier === 'good' || tier === 'best',
+      optPlaces: tier === 'good' || tier === 'best',
+      optMarriage: tier === 'good' || tier === 'best',
+      optSex: tier === 'good' || tier === 'best',
+      optOccupation: tier === 'best',
+      optBurial: tier === 'best'
+    };
+
+    Object.entries(checkboxes).forEach(([id, checked]) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = checked;
+    });
+
+    this.updateSizeEstimate();
+  }
+
+  // Update the URL mode label styles based on selection
+  updateUrlModeStyles() {
+    const labels = {
+      'urlModeMax': 'urlModeMaxLabel',
+      'urlModeCompact': 'urlModeCompactLabel',
+      'urlModeText': 'urlModeTextLabel'
+    };
+
+    Object.entries(labels).forEach(([radioId, labelId]) => {
+      const radio = document.getElementById(radioId);
+      const label = document.getElementById(labelId);
+      if (radio && label) {
+        if (radio.checked) {
+          label.style.borderColor = 'var(--accent)';
+          label.style.background = 'rgba(139, 90, 60, 0.05)';
+        } else {
+          label.style.borderColor = 'var(--border)';
+          label.style.background = 'transparent';
+        }
+      }
+    });
+  }
+
+  // Get the current data export options
+  getSelectedDataOptions() {
+    return {
+      years: document.getElementById('optYears')?.checked ?? true,
+      fullDates: document.getElementById('optFullDates')?.checked ?? false,
+      places: document.getElementById('optPlaces')?.checked ?? false,
+      marriage: document.getElementById('optMarriage')?.checked ?? false,
+      sex: document.getElementById('optSex')?.checked ?? false,
+      occupation: document.getElementById('optOccupation')?.checked ?? false,
+      burial: document.getElementById('optBurial')?.checked ?? false
+    };
+  }
+
+  // Extract year from GEDCOM date string
+  extractYear(dateStr) {
+    if (!dateStr) return '';
+    const match = dateStr.match(/\b(\d{4})\b/);
+    return match ? match[1] : '';
+  }
+
+  // Build filtered data based on selected options
+  buildFilteredData(options) {
+    const individuals = Object.entries(this.data.individuals).map(([id, p]) => {
+      const person = {
+        id,
+        n: p.displayName || p.name || 'Unknown',
+        famc: p.famc || [],
+        fams: p.fams || []
+      };
+
+      // Years only vs full dates
+      if (options.years || options.fullDates) {
+        if (options.fullDates) {
+          person.b = p.birth?.date || '';
+          person.d = p.death?.date || '';
+        } else {
+          person.b = this.extractYear(p.birth?.date);
+          person.d = this.extractYear(p.death?.date);
+        }
+      }
+
+      // Places
+      if (options.places) {
+        person.bp = p.birth?.place || '';
+        person.dp = p.death?.place || '';
+      }
+
+      // Sex
+      if (options.sex) {
+        person.s = p.sex || 'U';
+      }
+
+      // Occupation
+      if (options.occupation && p.occupation) {
+        person.occ = p.occupation;
+      }
+
+      // Burial
+      if (options.burial && p.burial) {
+        person.bur = p.burial.date || '';
+        person.burp = p.burial.place || '';
+      }
+
+      return person;
+    });
+
+    const families = Object.entries(this.data.families).map(([id, f]) => {
+      const family = {
+        id,
+        h: f.husband,
+        w: f.wife,
+        c: f.children || []
+      };
+
+      if (options.marriage && f.marriage?.date) {
+        family.m = options.fullDates ? f.marriage.date : this.extractYear(f.marriage.date);
+      }
+
+      return family;
+    });
+
+    return { individuals, families };
+  }
+
+  // Estimate URL size based on current options
+  async updateSizeEstimate() {
+    const options = this.getSelectedDataOptions();
+    const mode = document.querySelector('input[name="urlMode"]:checked')?.value || 'pure';
+
+    if (!this.data || !this.data.individuals || Object.keys(this.data.individuals).length === 0) {
+      document.getElementById('sizeEstimateValue').textContent = '— KB';
+      document.getElementById('sizeEstimateChars').textContent = 'Load a family tree first';
+      return;
+    }
+
+    try {
+      let estimatedSize;
+
+      if (mode === 'text') {
+        // Text-only is just plain text
+        const text = this.generatePlainText(options);
+        estimatedSize = new TextEncoder().encode(text).length;
+      } else {
+        // Build filtered data
+        const filteredData = this.buildFilteredData(options);
+        const jsonStr = JSON.stringify(filteredData);
+
+        if (mode === 'compressed') {
+          // Estimate compressed size (~40% of original for typical data)
+          const compressedBytes = await compressToB64url(jsonStr);
+          // Add ~2KB for the viewer HTML wrapper
+          estimatedSize = compressedBytes.length + 2000;
+        } else {
+          // Pure HTML - estimate based on tree HTML generation
+          // HTML is typically 2-3x the JSON size due to markup
+          estimatedSize = jsonStr.length * 2.5 + 1500; // Base HTML overhead
+        }
+      }
+
+      // Convert to base64 estimate (adds ~33%)
+      const base64Size = mode === 'text' ? estimatedSize : estimatedSize * 1.37;
+      const urlSize = base64Size + 22; // 'data:text/html;base64,' prefix
+
+      const sizeKB = (urlSize / 1024).toFixed(1);
+      const sizeChars = Math.round(urlSize).toLocaleString();
+
+      document.getElementById('sizeEstimateValue').textContent = `~${sizeKB} KB`;
+      document.getElementById('sizeEstimateChars').textContent = `~${sizeChars} characters`;
+
+      // Color code based on size
+      const sizeEl = document.getElementById('sizeEstimateValue');
+      if (urlSize > 100000) {
+        sizeEl.style.color = '#dc3545'; // Red - too large
+      } else if (urlSize > 50000) {
+        sizeEl.style.color = '#ffc107'; // Yellow - warning
+      } else if (urlSize > 20000) {
+        sizeEl.style.color = '#fd7e14'; // Orange - info
+      } else {
+        sizeEl.style.color = 'var(--accent)'; // Normal
+      }
+    } catch (e) {
+      console.error('Size estimate error:', e);
+      document.getElementById('sizeEstimateValue').textContent = '— KB';
+      document.getElementById('sizeEstimateChars').textContent = 'Error estimating';
+    }
+  }
+
+  // Generate plain text representation
+  generatePlainText(options) {
+    const lines = ['FAMILY TREE', '===========', ''];
+    const individuals = this.data.individuals;
+    const families = this.data.families;
+
+    // Sort by name
+    const sorted = Object.values(individuals).sort((a, b) =>
+      (a.displayName || a.name || '').localeCompare(b.displayName || b.name || '')
+    );
+
+    sorted.forEach(p => {
+      let line = p.displayName || p.name || 'Unknown';
+
+      if (options.years || options.fullDates) {
+        const b = options.fullDates ? p.birth?.date : this.extractYear(p.birth?.date);
+        const d = options.fullDates ? p.death?.date : this.extractYear(p.death?.date);
+        if (b || d) {
+          line += ` (${b || '?'} - ${d || ''})`;
+        }
+      }
+
+      if (options.places && (p.birth?.place || p.death?.place)) {
+        if (p.birth?.place) line += `, b. ${p.birth.place}`;
+        if (p.death?.place) line += `, d. ${p.death.place}`;
+      }
+
+      if (options.occupation && p.occupation) {
+        line += `, ${p.occupation}`;
+      }
+
+      lines.push(line);
+
+      // Add relationships
+      const famSpouse = (p.fams || []).map(fid => families[fid]).filter(Boolean);
+      famSpouse.forEach(f => {
+        const spouseId = f.husband === p.id ? f.wife : f.husband;
+        const spouse = individuals[spouseId];
+        if (spouse) {
+          let spLine = `  m. ${spouse.displayName || spouse.name}`;
+          if (options.marriage && f.marriage?.date) {
+            spLine += ` (${options.fullDates ? f.marriage.date : this.extractYear(f.marriage.date)})`;
+          }
+          lines.push(spLine);
+        }
+        (f.children || []).forEach(cid => {
+          const child = individuals[cid];
+          if (child) {
+            lines.push(`    → ${child.displayName || child.name}`);
+          }
+        });
+      });
+
+      lines.push('');
+    });
+
+    lines.push('---');
+    lines.push(`${Object.keys(individuals).length} people, ${Object.keys(families).length} families`);
+
+    return lines.join('\n');
   }
 
   async generateUrl() {
     try {
       // Check which mode is selected
       const mode = document.querySelector('input[name="urlMode"]:checked')?.value || 'pure';
+      const options = this.getSelectedDataOptions();
 
       // Generate URL based on selected mode
-      // Compressed mode uses native CompressionStream (async)
-      const url = mode === 'compressed'
-        ? await this.generateCompressedUrl()
-        : this.generatePureHtmlUrl();
-      
+      let url, modeLabel;
+      if (mode === 'text') {
+        url = this.generateTextUrl(options);
+        modeLabel = 'Text Only';
+      } else if (mode === 'compressed') {
+        url = await this.generateCompressedUrl(options);
+        modeLabel = 'Compact';
+      } else {
+        url = this.generatePureHtmlUrl(options);
+        modeLabel = 'Pure HTML';
+      }
+
       const sizeKB = url.length / 1024;
-      const modeLabel = mode === 'compressed' ? 'Compact' : 'Pure HTML';
 
       // Store for copy/open functions
       this._generatedUrl = url;
@@ -6954,6 +7327,16 @@ class FamilyTreeApp {
     }
   }
 
+  // Generate text-only URL
+  generateTextUrl(options) {
+    const text = this.generatePlainText(options);
+    const htmlWrapper = `<!DOCTYPE html><meta charset=utf-8><title>Family Tree</title>
+<style>body{font:14px/1.6 monospace;background:#f8f5f0;padding:2rem;max-width:800px;margin:0 auto}pre{white-space:pre-wrap;word-wrap:break-word}</style>
+<pre>${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+    const htmlBytes = new TextEncoder().encode(htmlWrapper);
+    return 'data:text/html;base64,' + uint8ToBase64(htmlBytes);
+  }
+
   openGeneratedUrl() {
     if (this._generatedUrl) {
       window.open(this._generatedUrl, '_blank');
@@ -6966,71 +7349,116 @@ class FamilyTreeApp {
   }
 
   // Build a nested HTML tree structure from family data
-  buildNestedTreeHtml() {
+  buildNestedTreeHtml(options = {}) {
     const individuals = this.data.individuals;
     const families = this.data.families;
-    
+
+    // Default options
+    const opts = {
+      years: true,
+      fullDates: true,
+      places: true,
+      sex: true,
+      marriage: true,
+      ...options
+    };
+
     // 1. Find all people who have parents in the data
     const hasParent = new Set();
     Object.values(families).forEach(f => {
       (f.children || []).forEach(c => hasParent.add(c));
     });
-    
+
     // 2. Find roots (people with no parents in data)
     const allIds = Object.keys(individuals);
     const roots = allIds.filter(id => !hasParent.has(id));
-    
+
     // 3. Build descendant and spouse maps
     const descendants = {}; // personId -> [childIds]
     const spouseMap = {};   // personId -> [spouseIds]
-    
+    const marriageMap = {}; // personId -> marriage info
+
     Object.values(families).forEach(f => {
       const children = f.children || [];
       if (f.husband) {
         descendants[f.husband] = [...(descendants[f.husband] || []), ...children];
-        if (f.wife) spouseMap[f.husband] = [...(spouseMap[f.husband] || []), f.wife];
+        if (f.wife) {
+          spouseMap[f.husband] = [...(spouseMap[f.husband] || []), f.wife];
+          if (f.marriage?.date) marriageMap[f.husband] = f.marriage;
+        }
       }
       if (f.wife) {
         descendants[f.wife] = [...(descendants[f.wife] || []), ...children];
-        if (f.husband) spouseMap[f.wife] = [...(spouseMap[f.wife] || []), f.husband];
+        if (f.husband) {
+          spouseMap[f.wife] = [...(spouseMap[f.wife] || []), f.husband];
+          if (f.marriage?.date) marriageMap[f.wife] = f.marriage;
+        }
       }
     });
-    
+
     // 4. HTML escape helper
     const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    
-    // 5. Format dates helper
+
+    // 5. Format dates helper based on options
     const formatDates = (p) => {
-      const b = p.birth?.date || '';
-      const d = p.death?.date || '';
+      if (!opts.years && !opts.fullDates) return '';
+
+      let b = p.birth?.date || '';
+      let d = p.death?.date || '';
+
+      // If only years, extract just the year
+      if (opts.years && !opts.fullDates) {
+        b = this.extractYear(b);
+        d = this.extractYear(d);
+      }
+
       if (!b && !d) return '';
       if (b && d) return `${b} – ${d}`;
       if (b) return `b. ${b}`;
       return `d. ${d}`;
     };
-    
-    // 6. Recursively render person and descendants
+
+    // 6. Format places
+    const formatPlaces = (p) => {
+      if (!opts.places) return '';
+      const parts = [];
+      if (p.birth?.place) parts.push(`b. ${p.birth.place}`);
+      if (p.death?.place) parts.push(`d. ${p.death.place}`);
+      return parts.join(', ');
+    };
+
+    // 7. Recursively render person and descendants
     const seen = new Set();
     const renderPerson = (id, depth = 0) => {
       if (seen.has(id) || depth > 20) return ''; // Prevent cycles
       seen.add(id);
-      
+
       const p = individuals[id];
       if (!p) return '';
-      
-      const sex = p.sex === 'M' ? 'm' : p.sex === 'F' ? 'f' : '';
+
+      const sex = opts.sex ? (p.sex === 'M' ? 'm' : p.sex === 'F' ? 'f' : '') : '';
       const name = p.displayName || p.name || 'Unknown';
       const dates = formatDates(p);
+      const places = formatPlaces(p);
       const spouses = (spouseMap[id] || [])
         .map(sid => individuals[sid]?.displayName || individuals[sid]?.name)
         .filter(Boolean);
-      const spouseText = spouses.length ? ` m. ${esc(spouses.join(', '))}` : '';
-      
+
+      let spouseText = '';
+      if (spouses.length) {
+        spouseText = ` m. ${esc(spouses.join(', '))}`;
+        if (opts.marriage && marriageMap[id]?.date) {
+          const mDate = opts.fullDates ? marriageMap[id].date : this.extractYear(marriageMap[id].date);
+          if (mDate) spouseText += ` (${esc(mDate)})`;
+        }
+      }
+
       let html = `<li><div class="p ${sex}"><span class="n">${esc(name)}</span>`;
       if (dates) html += `<br><span class="d">${esc(dates)}</span>`;
+      if (places) html += `<br><span class="d">${esc(places)}</span>`;
       if (spouseText) html += `<span class="s">${spouseText}</span>`;
       html += '</div>';
-      
+
       const children = descendants[id] || [];
       // Remove duplicates (child might appear via both parents)
       const uniqueChildren = [...new Set(children)].filter(c => !seen.has(c));
@@ -7040,28 +7468,28 @@ class FamilyTreeApp {
       html += '</li>';
       return html;
     };
-    
-    // 7. Render all roots
+
+    // 8. Render all roots
     if (roots.length === 0) {
       // No clear roots, just list everyone
       return '<ul>' + allIds.map(id => {
         const p = individuals[id];
-        const sex = p.sex === 'M' ? 'm' : p.sex === 'F' ? 'f' : '';
+        const sex = opts.sex ? (p.sex === 'M' ? 'm' : p.sex === 'F' ? 'f' : '') : '';
         const name = p.displayName || p.name || 'Unknown';
         const dates = formatDates(p);
         return `<li><div class="p ${sex}"><span class="n">${esc(name)}</span>${dates ? `<br><span class="d">${esc(dates)}</span>` : ''}</div></li>`;
       }).join('') + '</ul>';
     }
-    
+
     return '<ul>' + roots.map(r => renderPerson(r)).join('') + '</ul>';
   }
 
   // Generate pure HTML URL (no JavaScript required)
-  generatePureHtmlUrl() {
-    const treeHtml = this.buildNestedTreeHtml();
+  generatePureHtmlUrl(options = {}) {
+    const treeHtml = this.buildNestedTreeHtml(options);
     const count = Object.keys(this.data.individuals).length;
     const familyCount = Object.keys(this.data.families).length;
-    
+
     // Minimal CSS for tree rendering - works in any browser
     const html = `<!DOCTYPE html><meta charset=utf-8><title>After Me</title>
 <style>
@@ -7095,28 +7523,9 @@ ${treeHtml}
 
   // Generate compressed URL using native Compression Streams API
   // Zero dependencies - uses browser's built-in deflate-raw compression
-  async generateCompressedUrl() {
-    // Create a compact JSON representation of the family tree
-    const treeData = {
-      individuals: Object.entries(this.data.individuals).map(([id, p]) => ({
-        id,
-        n: p.displayName || p.name || 'Unknown',
-        s: p.sex || 'U',
-        b: p.birth?.date || '',
-        bp: p.birth?.place || '',
-        d: p.death?.date || '',
-        dp: p.death?.place || '',
-        famc: p.famc || [],
-        fams: p.fams || []
-      })),
-      families: Object.entries(this.data.families).map(([id, f]) => ({
-        id,
-        h: f.husband,
-        w: f.wife,
-        c: f.children || [],
-        m: f.marriage?.date || ''
-      }))
-    };
+  async generateCompressedUrl(options = {}) {
+    // Build filtered data based on selected options
+    const treeData = this.buildFilteredData(options);
 
     // Compress using native CompressionStream (deflate-raw format)
     const jsonData = JSON.stringify(treeData);
