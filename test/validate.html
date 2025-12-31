@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GEDCOM Parser Validation</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #f8f5f0;
+      color: #333;
+    }
+    h1 { color: #8b5a3c; }
+    .test-section {
+      background: white;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border-left: 4px solid #8b5a3c;
+    }
+    .test-section h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: #8b5a3c;
+    }
+    .result {
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    .pass { background: #d4edda; color: #155724; border-left: 3px solid #28a745; }
+    .fail { background: #f8d7da; color: #721c24; border-left: 3px solid #dc3545; }
+    .info { background: #d1ecf1; color: #0c5460; border-left: 3px solid #17a2b8; }
+    .warn { background: #fff3cd; color: #856404; border-left: 3px solid #ffc107; }
+    button {
+      background: #8b5a3c;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+    }
+    button:hover { background: #6d4430; }
+    #fileInput { margin: 1rem 0; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .stat-box {
+      background: #f8f5f0;
+      padding: 1rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #8b5a3c;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 GEDCOM Parser Validation</h1>
+  <p>This tool validates the lossless GEDCOM parser against test files.</p>
+
+  <div class="test-section">
+    <h2>📂 Load Test File</h2>
+    <input type="file" id="fileInput" accept=".ged">
+    <button onclick="runValidation()">Run Validation</button>
+    <button onclick="testRoundTrip()" id="roundTripBtn" disabled>Test Round-Trip</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script src="../build/parser-enhanced.js"></script>
+  <script>
+    let parsedResult = null;
+
+    function createResult(className, text) {
+      const div = document.createElement('div');
+      div.className = `result ${className}`;
+      div.textContent = text;
+      return div;
+    }
+
+    function createSection(title) {
+      const section = document.createElement('div');
+      section.className = 'test-section';
+      const h2 = document.createElement('h2');
+      h2.textContent = title;
+      section.appendChild(h2);
+      return section;
+    }
+
+    function createStatBox(number, label) {
+      const box = document.createElement('div');
+      box.className = 'stat-box';
+
+      const num = document.createElement('div');
+      num.className = 'stat-num';
+      num.textContent = number;
+
+      const lbl = document.createElement('div');
+      lbl.className = 'stat-label';
+      lbl.textContent = label;
+
+      box.appendChild(num);
+      box.appendChild(lbl);
+      return box;
+    }
+
+    async function runValidation() {
+      const fileInput = document.getElementById('fileInput');
+      const resultsDiv = document.getElementById('results');
+
+      if (!fileInput.files[0]) {
+        resultsDiv.textContent = '';
+        resultsDiv.appendChild(createResult('fail', '❌ Please select a GEDCOM file first'));
+        return;
+      }
+
+      resultsDiv.textContent = '';
+      resultsDiv.appendChild(createResult('info', '⏳ Parsing GEDCOM file...'));
+
+      try {
+        const text = await fileInput.files[0].text();
+        const parser = new LosslessGedcomParser();
+        parsedResult = parser.parse(text);
+
+        resultsDiv.textContent = '';
+
+        // Overview
+        const overviewSection = createSection('📊 Parse Summary');
+        overviewSection.appendChild(createResult('info', `✅ Successfully parsed ${parsedResult.meta.lineCount} lines`));
+        resultsDiv.appendChild(overviewSection);
+
+        // Record Counts
+        const countsSection = createSection('📈 Record Counts');
+
+        const recordCounts = {};
+        for (const [xref, node] of Object.entries(parsedResult.canonical.records)) {
+          const type = node.value;
+          recordCounts[type] = (recordCounts[type] || 0) + 1;
+        }
+
+        const statsGrid = document.createElement('div');
+        statsGrid.className = 'stats';
+        statsGrid.appendChild(createStatBox(recordCounts.INDI || 0, 'Individuals'));
+        statsGrid.appendChild(createStatBox(recordCounts.FAM || 0, 'Families'));
+        statsGrid.appendChild(createStatBox(recordCounts.SOUR || 0, 'Sources'));
+        statsGrid.appendChild(createStatBox(recordCounts.OBJE || 0, 'Media'));
+        statsGrid.appendChild(createStatBox(recordCounts.REPO || 0, 'Repositories'));
+        statsGrid.appendChild(createStatBox(recordCounts.NOTE || 0, 'Notes'));
+        countsSection.appendChild(statsGrid);
+
+        // Moore Family Tree validation
+        const fileName = fileInput.files[0].name;
+        if (fileName.includes('Moore')) {
+          const expectedINDI = 95, expectedSOUR = 61, expectedOBJE = 28;
+          if (recordCounts.INDI === expectedINDI && recordCounts.SOUR === expectedSOUR && recordCounts.OBJE === expectedOBJE) {
+            countsSection.appendChild(createResult('pass', '✅ Moore Family Tree: All expected counts match'));
+          } else {
+            countsSection.appendChild(createResult('warn', `⚠️ Moore Family Tree: Expected ${expectedINDI} INDI, ${expectedSOUR} SOUR, ${expectedOBJE} OBJE`));
+          }
+        }
+        resultsDiv.appendChild(countsSection);
+
+        // CONC/CONT Validation
+        const concSection = createSection('📝 CONC/CONT Line Joining');
+
+        let concContCount = 0;
+        function countConcCont(node) {
+          if (!node.children) return;
+          for (const child of node.children) {
+            if (child.tag === 'CONC' || child.tag === 'CONT') concContCount++;
+            countConcCont(child);
+          }
+        }
+        for (const [xref, node] of Object.entries(parsedResult.canonical.records)) {
+          countConcCont(node);
+        }
+
+        concSection.appendChild(createResult('info', `Found ${concContCount} CONC/CONT lines in canonical model`));
+
+        let joinedCount = 0;
+        for (const [id, person] of Object.entries(parsedResult.friendly.individuals)) {
+          if (person.notes) {
+            for (const note of person.notes) {
+              if (note.text && note.text.includes('\n')) joinedCount++;
+            }
+          }
+        }
+
+        if (concContCount > 0) {
+          const status = joinedCount > 0 ? 'pass' : 'warn';
+          const icon = joinedCount > 0 ? '✅' : '⚠️';
+          concSection.appendChild(createResult(status, `${icon} Found ${joinedCount} joined values with newlines`));
+        }
+        resultsDiv.appendChild(concSection);
+
+        // Custom Tags
+        const tagsSection = createSection('🏷️ Custom Tag Preservation');
+
+        const customTags = new Set();
+        function findCustomTags(node) {
+          if (!node) return;
+          if (node.tag && node.tag.startsWith('_')) customTags.add(node.tag);
+          if (node.children) node.children.forEach(findCustomTags);
+        }
+        for (const [xref, node] of Object.entries(parsedResult.canonical.records)) {
+          findCustomTags(node);
+        }
+
+        tagsSection.appendChild(createResult('info', `Custom tags found: ${customTags.size}`));
+        if (customTags.size > 0) {
+          tagsSection.appendChild(createResult('pass', `✅ Tags: ${Array.from(customTags).sort().join(', ')}`));
+
+          let customTagsInFriendly = 0;
+          for (const [id, person] of Object.entries(parsedResult.friendly.individuals)) {
+            if (person.customTags && Object.keys(person.customTags).length > 0) customTagsInFriendly++;
+          }
+          tagsSection.appendChild(createResult('pass', `✅ ${customTagsInFriendly} individuals with custom tags in friendly model`));
+        }
+        resultsDiv.appendChild(tagsSection);
+
+        // Events
+        const eventsSection = createSection('📅 Events');
+        let eventCount = 0;
+        for (const [id, person] of Object.entries(parsedResult.friendly.individuals)) {
+          if (person.events) eventCount += person.events.length;
+        }
+        const eventStatus = eventCount > 0 ? 'pass' : 'fail';
+        const eventIcon = eventCount > 0 ? '✅' : '❌';
+        eventsSection.appendChild(createResult(eventStatus, `${eventIcon} ${eventCount} events parsed`));
+        resultsDiv.appendChild(eventsSection);
+
+        // Sources
+        const sourcesSection = createSection('📄 Sources & Citations');
+        let citationCount = 0;
+        for (const [id, person] of Object.entries(parsedResult.friendly.individuals)) {
+          if (person.sources) citationCount += person.sources.length;
+        }
+        const sourceStatus = Object.keys(parsedResult.friendly.sources).length > 0 ? 'pass' : 'fail';
+        const sourceIcon = Object.keys(parsedResult.friendly.sources).length > 0 ? '✅' : '❌';
+        sourcesSection.appendChild(createResult(sourceStatus, `${sourceIcon} ${Object.keys(parsedResult.friendly.sources).length} source records, ${citationCount} citations`));
+        resultsDiv.appendChild(sourcesSection);
+
+        // Media
+        const mediaSection = createSection('🖼️ Media Objects');
+        let mediaLinkCount = 0;
+        for (const [id, person] of Object.entries(parsedResult.friendly.individuals)) {
+          if (person.media) mediaLinkCount += person.media.length;
+        }
+        const mediaStatus = Object.keys(parsedResult.friendly.media).length > 0 ? 'pass' : 'fail';
+        const mediaIcon = Object.keys(parsedResult.friendly.media).length > 0 ? '✅' : '❌';
+        mediaSection.appendChild(createResult(mediaStatus, `${mediaIcon} ${Object.keys(parsedResult.friendly.media).length} media records, ${mediaLinkCount} links`));
+        resultsDiv.appendChild(mediaSection);
+
+      } catch (e) {
+        resultsDiv.textContent = '';
+        resultsDiv.appendChild(createResult('fail', `❌ Error: ${e.message}`));
+        console.error(e);
+      }
+
+      // Enable round-trip button
+      document.getElementById('roundTripBtn').disabled = false;
+    }
+
+    function exportCanonicalToGedcom(canonical) {
+      const MAX_LINE_LENGTH = 255;
+      let output = '';
+
+      const exportNode = (node) => {
+        if (!node) return '';
+        let result = '';
+        const xrefPart = node.xref ? `${node.xref} ` : '';
+        const fullLine = `${node.level} ${xrefPart}${node.tag}${node.value ? ' ' + node.value : ''}`;
+
+        if (fullLine.length <= MAX_LINE_LENGTH) {
+          result += fullLine + '\n';
+        } else {
+          if (node.value) {
+            const prefix = `${node.level} ${xrefPart}${node.tag} `;
+            const availableLength = MAX_LINE_LENGTH - prefix.length;
+            result += prefix + node.value.substring(0, availableLength) + '\n';
+            let remaining = node.value.substring(availableLength);
+            const contLevel = node.level + 1;
+            while (remaining.length > 0) {
+              const contPrefix = `${contLevel} CONC `;
+              const contAvailable = MAX_LINE_LENGTH - contPrefix.length;
+              const part = remaining.substring(0, contAvailable);
+              result += contPrefix + part + '\n';
+              remaining = remaining.substring(contAvailable);
+            }
+          } else {
+            result += `${node.level} ${xrefPart}${node.tag}\n`;
+          }
+        }
+
+        if (node.children && node.children.length > 0) {
+          for (const child of node.children) {
+            result += exportNode(child);
+          }
+        }
+        return result;
+      };
+
+      if (canonical.header) output += exportNode(canonical.header);
+      for (const [xref, node] of Object.entries(canonical.records)) {
+        output += exportNode(node);
+      }
+      if (canonical.trailer) output += '0 TRLR\n';
+
+      return output;
+    }
+
+    async function testRoundTrip() {
+      if (!parsedResult) {
+        alert('Please run validation first');
+        return;
+      }
+
+      const resultsDiv = document.getElementById('results');
+      const rtSection = createSection('🔄 Round-Trip Fidelity Test');
+
+      try {
+        // Step 1: Export canonical to GEDCOM
+        rtSection.appendChild(createResult('info', '⏳ Step 1: Exporting canonical model to GEDCOM...'));
+        const exported = exportCanonicalToGedcom(parsedResult.canonical);
+        rtSection.appendChild(createResult('pass', `✅ Exported ${exported.split('\n').length} lines`));
+
+        // Step 2: Re-parse the exported GEDCOM
+        rtSection.appendChild(createResult('info', '⏳ Step 2: Re-parsing exported GEDCOM...'));
+        const parser = new LosslessGedcomParser();
+        const reparsed = parser.parse(exported);
+        rtSection.appendChild(createResult('pass', `✅ Re-parsed ${reparsed.meta.lineCount} lines`));
+
+        // Step 3: Compare record counts
+        rtSection.appendChild(createResult('info', '⏳ Step 3: Comparing record counts...'));
+        const originalCount = Object.keys(parsedResult.canonical.records).length;
+        const reparsedCount = Object.keys(reparsed.canonical.records).length;
+
+        if (originalCount === reparsedCount) {
+          rtSection.appendChild(createResult('pass', `✅ Record count matches: ${originalCount} records`));
+        } else {
+          rtSection.appendChild(createResult('fail', `❌ Record count mismatch: ${originalCount} → ${reparsedCount}`));
+        }
+
+        // Step 4: Compare record types
+        rtSection.appendChild(createResult('info', '⏳ Step 4: Comparing record types...'));
+        const originalTypes = {};
+        const reparsedTypes = {};
+
+        for (const [xref, node] of Object.entries(parsedResult.canonical.records)) {
+          originalTypes[node.value] = (originalTypes[node.value] || 0) + 1;
+        }
+        for (const [xref, node] of Object.entries(reparsed.canonical.records)) {
+          reparsedTypes[node.value] = (reparsedTypes[node.value] || 0) + 1;
+        }
+
+        let typeMatch = true;
+        for (const type of Object.keys(originalTypes)) {
+          if (originalTypes[type] !== reparsedTypes[type]) {
+            rtSection.appendChild(createResult('fail', `❌ ${type} mismatch: ${originalTypes[type]} → ${reparsedTypes[type] || 0}`));
+            typeMatch = false;
+          }
+        }
+
+        if (typeMatch) {
+          rtSection.appendChild(createResult('pass', '✅ All record types match'));
+        }
+
+        // Step 5: Summary
+        rtSection.appendChild(createResult('info', '📋 Round-trip test complete'));
+        if (originalCount === reparsedCount && typeMatch) {
+          rtSection.appendChild(createResult('pass', '✅ PASSED: Export → Parse preserves all records'));
+        } else {
+          rtSection.appendChild(createResult('warn', '⚠️ Some differences detected in round-trip'));
+        }
+
+      } catch (e) {
+        rtSection.appendChild(createResult('fail', `❌ Round-trip test failed: ${e.message}`));
+        console.error(e);
+      }
+
+      resultsDiv.appendChild(rtSection);
+    }
+  </script>
+</body>
+</html>
