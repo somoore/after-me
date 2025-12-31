@@ -8440,7 +8440,8 @@ class FamilyTreeApp {
   }
 
   /**
-   * Update the QR code compatibility indicator
+   * Update the barcode compatibility indicator
+   * Hides the section entirely if URL is too large for both formats
    * @param {number} urlSize - Estimated URL size in bytes
    * @param {object} options - Current data options
    */
@@ -8448,6 +8449,9 @@ class FamilyTreeApp {
     const maxQRCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW); // ~2953 bytes
     const maxAztecCapacity = AztecCodeGenerator.getMaxCapacity(23); // ~3800+ bytes
     const peopleCount = this.data?.individuals ? Object.keys(this.data.individuals).length : 0;
+
+    // Main container
+    const barcodeSection = document.getElementById('barcodeCompatibility');
 
     // QR Code elements
     const qrStatusEl = document.getElementById('qrCompatStatus');
@@ -8461,25 +8465,29 @@ class FamilyTreeApp {
     const infoEl = document.getElementById('barcodeCompatInfo');
 
     if (!urlSize || urlSize === 0) {
-      qrStatusEl.textContent = '—';
-      qrFillEl.style.width = '0%';
-      qrFillEl.style.background = '#e0d8ce';
-      aztecStatusEl.textContent = '—';
-      aztecFillEl.style.width = '0%';
-      aztecFillEl.style.background = '#e0d8ce';
-      infoEl.textContent = 'Load a family tree first';
+      // No data loaded - hide the section
+      barcodeSection.style.display = 'none';
       return;
     }
 
-    // Check current mode
-    const checkedRadio = document.querySelector('input[name="urlMode"]:checked');
-    const mode = checkedRadio ? checkedRadio.value : 'pure';
+    // Check if URL fits in either format
+    const fitsQR = urlSize <= maxQRCapacity;
+    const fitsAztec = urlSize <= maxAztecCapacity;
+
+    if (!fitsQR && !fitsAztec) {
+      // Too large for both formats - hide the entire section
+      barcodeSection.style.display = 'none';
+      return;
+    }
+
+    // At least one format works - show the section
+    barcodeSection.style.display = 'block';
 
     // Update QR Code status
     const qrPercentUsed = Math.min((urlSize / maxQRCapacity) * 100, 100);
     qrFillEl.style.width = `${qrPercentUsed}%`;
 
-    if (urlSize <= maxQRCapacity) {
+    if (fitsQR) {
       qrStatusEl.innerHTML = '<span style="color: #2d8a4e;">✓ Fits</span>';
       qrFillEl.style.background = '#2d8a4e';
     } else {
@@ -8491,7 +8499,7 @@ class FamilyTreeApp {
     const aztecPercentUsed = Math.min((urlSize / maxAztecCapacity) * 100, 100);
     aztecFillEl.style.width = `${aztecPercentUsed}%`;
 
-    if (urlSize <= maxAztecCapacity) {
+    if (fitsAztec) {
       aztecStatusEl.innerHTML = '<span style="color: #2d8a4e;">✓ Fits</span>';
       aztecFillEl.style.background = '#2d8a4e';
     } else {
@@ -8500,25 +8508,11 @@ class FamilyTreeApp {
     }
 
     // Update info text
-    const bytesPerPerson = urlSize / peopleCount;
-
-    // Calculate max people for each format with minimal settings
-    const minimalBytesPerPerson = 22;
-    const wrapperOverhead = 1500;
-    const qrMaxPeople = Math.floor((maxQRCapacity - wrapperOverhead) / minimalBytesPerPerson);
-    const aztecMaxPeople = Math.floor((maxAztecCapacity - wrapperOverhead) / minimalBytesPerPerson);
-
-    if (urlSize <= maxQRCapacity) {
+    if (fitsQR) {
       infoEl.innerHTML = `<span style="color: #2d8a4e;">✓ Both formats available!</span> Using ${(urlSize / 1024).toFixed(1)} KB`;
-    } else if (urlSize <= maxAztecCapacity) {
-      infoEl.innerHTML = `<span style="color: #2d8a4e;">✓ Aztec Code fits!</span> QR: max ${(maxQRCapacity / 1024).toFixed(1)} KB • Aztec: ${(urlSize / 1024).toFixed(1)} KB of ${(maxAztecCapacity / 1024).toFixed(1)} KB`;
     } else {
-      let msg = `${peopleCount} people too large for both formats`;
-      if (mode !== 'compressed') {
-        msg += '<br><span style="color: #4a7eb8;">Tip: Use Compact format + Minimal preset</span>';
-      }
-      msg += `<br><span style="color: var(--text-muted);">QR max: ~${qrMaxPeople} people • Aztec max: ~${aztecMaxPeople} people</span>`;
-      infoEl.innerHTML = msg;
+      // Only Aztec fits
+      infoEl.innerHTML = `<span style="color: #2d8a4e;">✓ Aztec Code fits!</span> (QR max: ${(maxQRCapacity / 1024).toFixed(1)} KB)`;
     }
   }
 
