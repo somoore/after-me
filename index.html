@@ -4411,7 +4411,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
         <div class="drop-icon">📂</div>
         <div>Drop GEDCOM file here</div>
         <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">Supports Ancestry, FamilySearch, MyHeritage exports</div>
-        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip">
+        <input type="file" id="fileInput" accept=".ged,.gedcom,.zip,application/zip,application/x-zip-compressed,*/*">
       </div>
       <div class="or-divider">or</div>
       <button class="btn-start-new" id="startNew">Start New Tree</button>
@@ -5800,26 +5800,61 @@ class FamilyTreeApp {
   async extractZip(file) {
     const buf = await file.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    
+
     if (bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
       throw new Error('Invalid ZIP file');
     }
 
-    const method = bytes[8] | (bytes[9] << 8);
-    const compSize = bytes[18] | (bytes[19] << 8) | (bytes[20] << 16) | (bytes[21] << 24);
-    const nameLen = bytes[26] | (bytes[27] << 8);
-    const extraLen = bytes[28] | (bytes[29] << 8);
-    const dataStart = 30 + nameLen + extraLen;
-    const compData = bytes.slice(dataStart, dataStart + compSize);
+    // Parse all local file headers to find .ged/.gedcom files
+    const entries = [];
+    let offset = 0;
 
-    if (method === 0) {
+    while (offset < bytes.length - 4) {
+      // Check for local file header signature (PK\x03\x04)
+      if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B &&
+          bytes[offset + 2] === 0x03 && bytes[offset + 3] === 0x04) {
+
+        const method = bytes[offset + 8] | (bytes[offset + 9] << 8);
+        const compSize = bytes[offset + 18] | (bytes[offset + 19] << 8) |
+                        (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
+        const uncompSize = bytes[offset + 22] | (bytes[offset + 23] << 8) |
+                          (bytes[offset + 24] << 16) | (bytes[offset + 25] << 24);
+        const nameLen = bytes[offset + 26] | (bytes[offset + 27] << 8);
+        const extraLen = bytes[offset + 28] | (bytes[offset + 29] << 8);
+        const nameBytes = bytes.slice(offset + 30, offset + 30 + nameLen);
+        const fileName = new TextDecoder().decode(nameBytes);
+        const dataStart = offset + 30 + nameLen + extraLen;
+        const dataSize = compSize > 0 ? compSize : uncompSize;
+
+        entries.push({ fileName, method, dataStart, compSize: dataSize, uncompSize });
+        offset = dataStart + dataSize;
+      } else if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4B) {
+        // Other PK signature (central directory, etc.) - stop parsing
+        break;
+      } else {
+        offset++;
+      }
+    }
+
+    // Find the first .ged or .gedcom file
+    const gedEntry = entries.find(e =>
+      /\.(ged|gedcom)$/i.test(e.fileName) && !e.fileName.startsWith('__MACOSX')
+    ) || entries.find(e => !e.fileName.endsWith('/') && !e.fileName.startsWith('__MACOSX'));
+
+    if (!gedEntry) {
+      throw new Error('No GEDCOM file found in ZIP');
+    }
+
+    const compData = bytes.slice(gedEntry.dataStart, gedEntry.dataStart + gedEntry.compSize);
+
+    if (gedEntry.method === 0) {
       // Stored (no compression)
       return new TextDecoder().decode(compData);
-    } else if (method === 8) {
+    } else if (gedEntry.method === 8) {
       // Deflate
       return new TextDecoder().decode(pako.inflateRaw(compData));
     } else {
-      throw new Error('Unsupported compression method');
+      throw new Error('Unsupported compression method: ' + gedEntry.method);
     }
   }
 
