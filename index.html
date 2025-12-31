@@ -4579,21 +4579,21 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
       <div style="margin-bottom: 1rem;">
         <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">URL Format:</div>
         <div style="display: flex; gap: 0.5rem;">
-          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--accent); border-radius: 8px; cursor: pointer; transition: all 0.2s; background: rgba(139, 90, 60, 0.05); text-align: center;" id="urlModeMaxLabel">
+          <div class="url-format-option" style="flex: 1; padding: 0.6rem; border: 2px solid var(--accent); border-radius: 8px; cursor: pointer; transition: all 0.2s; background: rgba(139, 90, 60, 0.05); text-align: center;" id="urlModeMaxLabel" data-radio="urlModeMax">
             <input type="radio" name="urlMode" id="urlModeMax" value="pure" checked style="margin-right: 0.25rem;">
             <strong>Pure HTML</strong>
             <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">No JS needed</div>
-          </label>
-          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeCompactLabel">
+          </div>
+          <div class="url-format-option" style="flex: 1; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeCompactLabel" data-radio="urlModeCompact">
             <input type="radio" name="urlMode" id="urlModeCompact" value="compressed" style="margin-right: 0.25rem;">
             <strong>Compact</strong>
             <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">~30% smaller</div>
-          </label>
-          <label style="flex: 1; display: block; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeTextLabel">
+          </div>
+          <div class="url-format-option" style="flex: 1; padding: 0.6rem; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; text-align: center;" id="urlModeTextLabel" data-radio="urlModeText">
             <input type="radio" name="urlMode" id="urlModeText" value="text" style="margin-right: 0.25rem;">
             <strong>Text Only</strong>
             <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">Plain text</div>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -5865,9 +5865,27 @@ class FamilyTreeApp {
 
     // URL mode radio buttons trigger size estimate and label styling
     document.querySelectorAll('input[name="urlMode"]').forEach(radio => {
-      radio.addEventListener('change', () => {
+      radio.addEventListener('change', (e) => {
+        console.log('Radio changed:', e.target.id, 'value:', e.target.value, 'checked:', e.target.checked);
         this.updateUrlModeStyles();
         this.updateSizeEstimate();
+      });
+    });
+
+    // Make the entire format option container clickable
+    document.querySelectorAll('.url-format-option').forEach(container => {
+      container.addEventListener('click', (e) => {
+        // Don't double-fire if clicking directly on the radio button
+        if (e.target.tagName === 'INPUT') return;
+
+        const radioId = container.dataset.radio;
+        const radio = document.getElementById(radioId);
+        if (radio && !radio.checked) {
+          radio.checked = true;
+          // Manually trigger change event
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('Container click - selected:', radioId);
+        }
       });
     });
 
@@ -7013,6 +7031,11 @@ class FamilyTreeApp {
     document.getElementById('urlButtons').style.display = 'none';
     document.getElementById('urlCloseOnly').style.display = 'flex';
     document.getElementById('generateUrlBtn').style.display = 'block';
+
+    // Reset radio to Pure HTML (default) on modal open
+    const pureRadio = document.getElementById('urlModeMax');
+    if (pureRadio) pureRadio.checked = true;
+
     document.getElementById('urlModal').classList.add('show');
 
     // Update size estimate when modal opens
@@ -7150,7 +7173,9 @@ class FamilyTreeApp {
   // Estimate URL size based on current options
   async updateSizeEstimate() {
     const options = this.getSelectedDataOptions();
-    const mode = document.querySelector('input[name="urlMode"]:checked')?.value || 'pure';
+    const checkedRadio = document.querySelector('input[name="urlMode"]:checked');
+    const mode = checkedRadio ? checkedRadio.value : 'pure';
+    console.log('Size estimate - Mode:', mode, 'Radio:', checkedRadio?.id);
 
     if (!this.data || !this.data.individuals || Object.keys(this.data.individuals).length === 0) {
       document.getElementById('sizeEstimateValue').textContent = '— KB';
@@ -7274,9 +7299,12 @@ class FamilyTreeApp {
 
   async generateUrl() {
     try {
-      // Check which mode is selected
-      const mode = document.querySelector('input[name="urlMode"]:checked')?.value || 'pure';
+      // Check which mode is selected - get the actual checked radio element
+      const checkedRadio = document.querySelector('input[name="urlMode"]:checked');
+      const mode = checkedRadio ? checkedRadio.value : 'pure';
       const options = this.getSelectedDataOptions();
+
+      console.log('Generate URL - Mode:', mode, 'Radio element:', checkedRadio?.id);
 
       // Generate URL based on selected mode
       let url, modeLabel;
@@ -7287,6 +7315,7 @@ class FamilyTreeApp {
         url = await this.generateCompressedUrl(options);
         modeLabel = 'Compact';
       } else {
+        // Default to pure HTML
         url = this.generatePureHtmlUrl(options);
         modeLabel = 'Pure HTML';
       }
