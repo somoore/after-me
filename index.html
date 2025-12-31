@@ -5618,10 +5618,10 @@ class FamilyTreeApp {
       dropZone.classList.remove('dragover');
       if (e.dataTransfer && e.dataTransfer.files[0]) this.loadFile(e.dataTransfer.files[0]);
     });
-    fileInput.addEventListener('change', e => {
+    fileInput.addEventListener('change', async e => {
       const file = e.target.files && e.target.files[0];
       if (file) {
-        this.loadFile(file);
+        await this.loadFile(file);
         // Reset input to allow re-selecting the same file
         fileInput.value = '';
       }
