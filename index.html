@@ -4563,6 +4563,7 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
 
       <!-- Quick tier presets -->
       <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <button class="btn" id="presetMinimal" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;" title="Names and relationships only - best for QR codes">Minimal</button>
         <button class="btn" id="presetBasic" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Basic</button>
         <button class="btn" id="presetGood" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Good</button>
         <button class="btn" id="presetBest" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Best</button>
@@ -4573,6 +4574,18 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Estimated URL Size</div>
         <div id="sizeEstimateValue" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">— KB</div>
         <div id="sizeEstimateChars" style="font-size: 0.75rem; color: var(--text-muted);">— characters</div>
+      </div>
+
+      <!-- QR Code Compatibility Indicator -->
+      <div id="qrCompatibility" style="background: var(--bg-warm); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+          <div style="font-size: 0.8rem; color: var(--text-muted);">QR Code Compatibility</div>
+          <div id="qrCompatStatus" style="font-size: 0.85rem; font-weight: 600;">—</div>
+        </div>
+        <div id="qrCompatBar" style="height: 8px; background: #e0d8ce; border-radius: 4px; overflow: hidden;">
+          <div id="qrCompatFill" style="height: 100%; width: 0%; background: #2d8a4e; transition: width 0.3s, background 0.3s;"></div>
+        </div>
+        <div id="qrCompatInfo" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; text-align: center;">—</div>
       </div>
 
       <!-- Format selection -->
@@ -6579,6 +6592,7 @@ class FamilyTreeApp {
     });
 
     // URL data options - presets
+    document.getElementById('presetMinimal').addEventListener('click', () => this.applyDataPreset('minimal'));
     document.getElementById('presetBasic').addEventListener('click', () => this.applyDataPreset('basic'));
     document.getElementById('presetGood').addEventListener('click', () => this.applyDataPreset('good'));
     document.getElementById('presetBest').addEventListener('click', () => this.applyDataPreset('best'));
@@ -7783,10 +7797,18 @@ class FamilyTreeApp {
       optBurial: tier === 'best'
     };
 
-    Object.entries(checkboxes).forEach(([id, checked]) => {
-      const el = document.getElementById(id);
-      if (el) el.checked = checked;
-    });
+    // Minimal tier: only names and relationships (all options unchecked)
+    if (tier === 'minimal') {
+      Object.keys(checkboxes).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+    } else {
+      Object.entries(checkboxes).forEach(([id, checked]) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = checked;
+      });
+    }
 
     this.updateSizeEstimate();
   }
@@ -7956,10 +7978,78 @@ class FamilyTreeApp {
       } else {
         sizeEl.style.color = 'var(--accent)'; // Normal
       }
+
+      // Update QR code compatibility indicator
+      this.updateQRCompatibility(urlSize, options);
     } catch (e) {
       console.error('Size estimate error:', e);
       document.getElementById('sizeEstimateValue').textContent = '— KB';
       document.getElementById('sizeEstimateChars').textContent = 'Error estimating';
+      this.updateQRCompatibility(0, null);
+    }
+  }
+
+  /**
+   * Update the QR code compatibility indicator
+   * @param {number} urlSize - Estimated URL size in bytes
+   * @param {object} options - Current data options
+   */
+  updateQRCompatibility(urlSize, options) {
+    const maxQRCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW); // ~2953 bytes
+    const statusEl = document.getElementById('qrCompatStatus');
+    const fillEl = document.getElementById('qrCompatFill');
+    const infoEl = document.getElementById('qrCompatInfo');
+    const peopleCount = this.data?.individuals ? Object.keys(this.data.individuals).length : 0;
+
+    if (!urlSize || urlSize === 0) {
+      statusEl.textContent = '—';
+      statusEl.style.color = 'var(--text-muted)';
+      fillEl.style.width = '0%';
+      fillEl.style.background = '#e0d8ce';
+      infoEl.textContent = 'Load a family tree first';
+      return;
+    }
+
+    // Check current mode
+    const checkedRadio = document.querySelector('input[name="urlMode"]:checked');
+    const mode = checkedRadio ? checkedRadio.value : 'pure';
+
+    const percentUsed = Math.min((urlSize / maxQRCapacity) * 100, 100);
+    fillEl.style.width = `${percentUsed}%`;
+
+    if (urlSize <= maxQRCapacity) {
+      // Can fit in QR code
+      statusEl.innerHTML = '<span style="color: #2d8a4e;">✓ QR Compatible</span>';
+      fillEl.style.background = '#2d8a4e';
+      infoEl.textContent = `Using ${(urlSize / 1024).toFixed(1)} KB of ${(maxQRCapacity / 1024).toFixed(1)} KB QR capacity`;
+    } else {
+      // Too large for QR code
+      statusEl.innerHTML = '<span style="color: #dc3545;">✗ Too Large for QR</span>';
+      fillEl.style.background = '#dc3545';
+
+      // Calculate how many people might fit with current settings
+      const bytesPerPerson = urlSize / peopleCount;
+      const estimatedMaxPeople = Math.floor(maxQRCapacity / bytesPerPerson);
+
+      // Calculate with minimal settings + compact mode
+      // Minimal data: ~20-25 bytes per person compressed (id, name, family refs)
+      // Plus ~1500 bytes for compressed HTML viewer wrapper
+      const minimalCompressedBytesPerPerson = 22;
+      const wrapperOverhead = 1500;
+      const minimalMaxPeople = Math.floor((maxQRCapacity - wrapperOverhead) / minimalCompressedBytesPerPerson);
+
+      let suggestion = '';
+      if (mode !== 'compressed') {
+        suggestion = '<br><span style="color: #4a7eb8;">Tip: Use Compact format for smallest size</span>';
+      }
+
+      if (peopleCount <= minimalMaxPeople) {
+        infoEl.innerHTML = `Current: ${(urlSize / 1024).toFixed(1)} KB (need ≤${(maxQRCapacity / 1024).toFixed(1)} KB)<br>` +
+          `<span style="color: #2d8a4e;">✓ Try Minimal preset + Compact format</span>` + suggestion;
+      } else {
+        infoEl.innerHTML = `${peopleCount} people is too large for any QR code<br>` +
+          `<span style="color: var(--text-muted);">Max ~${minimalMaxPeople} people with Minimal + Compact</span>` + suggestion;
+      }
     }
   }
 
