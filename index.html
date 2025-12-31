@@ -5787,13 +5787,10 @@ class FamilyTreeApp {
     });
   }
 
-  readText(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
+  async readText(file) {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    return this.decodeBytes(bytes);
   }
 
   async extractZip(file) {
@@ -5846,15 +5843,43 @@ class FamilyTreeApp {
 
     const compData = bytes.slice(gedEntry.dataStart, gedEntry.dataStart + gedEntry.compSize);
 
+    let rawBytes;
     if (gedEntry.method === 0) {
       // Stored (no compression)
-      return new TextDecoder().decode(compData);
+      rawBytes = compData;
     } else if (gedEntry.method === 8) {
       // Deflate
-      return new TextDecoder().decode(pako.inflateRaw(compData));
+      rawBytes = pako.inflateRaw(compData);
     } else {
       throw new Error('Unsupported compression method: ' + gedEntry.method);
     }
+
+    // Decode with proper encoding detection
+    return this.decodeBytes(rawBytes);
+  }
+
+  decodeBytes(bytes) {
+    // Detect encoding from BOM or content
+    let encoding = 'utf-8';
+    let start = 0;
+
+    if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+      encoding = 'utf-16le';
+      start = 2;
+    } else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+      encoding = 'utf-16be';
+      start = 2;
+    } else if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+      encoding = 'utf-8';
+      start = 3;
+    } else if (bytes[0] === 0x30 && bytes[1] === 0x00) {
+      encoding = 'utf-16le';
+    } else if (bytes[0] === 0x00 && bytes[1] === 0x30) {
+      encoding = 'utf-16be';
+    }
+
+    const decoder = new TextDecoder(encoding);
+    return decoder.decode(bytes.slice(start));
   }
 
   buildGraph() {
