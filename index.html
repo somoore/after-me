@@ -5761,6 +5761,11 @@ class FamilyTreeApp {
   }
 
   async loadFile(file) {
+    if (!file || !file.size) {
+      this.toast('Error: No file selected or file is empty');
+      return;
+    }
+    
     this.showLoading('Reading file...');
     try {
       let text;
@@ -5772,6 +5777,10 @@ class FamilyTreeApp {
       } else {
         text = await this.readText(file);
       }
+      
+      if (!text || !text.trim()) {
+        throw new Error('File appears to be empty');
+      }
 
       this.showLoading('Parsing GEDCOM...');
       const parsed = this.parser.parse(text);
@@ -5779,13 +5788,21 @@ class FamilyTreeApp {
       this.data = parsed.friendly;
       this.meta = parsed.meta;
 
+      const individualCount = Object.keys(this.data.individuals).length;
+      
+      if (individualCount === 0) {
+        this.toast('Warning: No people found in file. Is this a valid GEDCOM?');
+        this.hideLoading();
+        return;
+      }
+      
       this.showLoading('Building visualization...');
       this.buildGraph();
       this.hideWelcome();
-      this.toast(`Loaded ${Object.keys(this.data.individuals).length} people`);
+      this.toast(`Loaded ${individualCount} people`);
     } catch (e) {
       console.error('Error loading file:', e);
-      this.toast('Error: ' + e.message);
+      this.toast('Error: ' + (e.message || 'Unknown error loading file'));
     }
     this.hideLoading();
   }
@@ -5794,8 +5811,12 @@ class FamilyTreeApp {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(new Uint8Array(reader.result));
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file.slice(0, 4));
+      reader.onerror = () => reject(new Error('Failed to read file header'));
+      try {
+        reader.readAsArrayBuffer(file.slice(0, 4));
+      } catch (e) {
+        reject(new Error('Failed to read file: ' + e.message));
+      }
     });
   }
 
