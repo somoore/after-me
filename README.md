@@ -35,8 +35,21 @@ Transform your family history into a self-contained, archival-grade time capsule
 
 ---
 
+## Live Demo
+
+**[Try After Me Online](https://somoore.github.io/after-me/)** - No installation required!
+
+---
+
 ## Quick Start
 
+### Online (Recommended)
+1. Visit the [live demo](https://somoore.github.io/after-me/)
+2. Upload your GEDCOM file (drag & drop or click "Load")
+3. Explore your family tree
+4. Share via HTML capsule or URL
+
+### Local
 1. Open `index.html` in any modern browser
 2. Load your GEDCOM file (drag & drop or click "Load")
 3. Explore your family tree
@@ -75,6 +88,21 @@ After Me runs entirely in your browser:
 - No tracking or analytics
 - No cookies or storage
 - Full offline capability
+
+---
+
+## Hosting Your Own
+
+After Me works with any static hosting service:
+
+### GitHub Pages
+1. Fork this repository
+2. Go to Settings → Pages
+3. Under "Build and deployment", select "GitHub Actions"
+4. Your site will be live at `https://YOUR-USERNAME.github.io/after-me/`
+
+### Other Static Hosts
+Simply upload `index.html` to any static host (Netlify, Vercel, S3, etc.) - no build step required.
 
 ---
 
