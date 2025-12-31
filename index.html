@@ -4602,6 +4602,20 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
       <div class="url-output" id="urlOutput" style="display: none;"></div>
       <div class="url-stats" id="urlStats" style="display: none;"></div>
       <div class="url-warning" id="urlWarning" style="display: none; margin: 1rem 0; padding: 0.75rem; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px; color: #856404; font-size: 0.9rem;"></div>
+
+      <!-- QR Code Section -->
+      <div id="qrCodeSection" style="display: none; margin: 1rem 0; text-align: center;">
+        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--text);">QR Code</div>
+        <div id="qrCodeContainer" style="display: inline-block; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <canvas id="qrCodeCanvas"></canvas>
+        </div>
+        <div id="qrCodeInfo" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;"></div>
+        <div id="qrCodeWarning" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border-radius: 4px; color: #856404; font-size: 0.8rem;"></div>
+        <button class="btn" id="saveQrCodeBtn" style="margin-top: 0.75rem;">
+          <span style="margin-right: 0.25rem;">💾</span> Save QR Code as Image
+        </button>
+      </div>
+
       <div class="modal-buttons" id="urlButtons" style="display: none;">
         <button class="btn" id="closeUrlModal">Close</button>
         <button class="btn" id="downloadCapsuleBtn">📁 Download HTML</button>
@@ -4725,6 +4739,716 @@ module.exports = __WEBPACK_EXTERNAL_MODULE__4__;
   <div class="toast-container" id="toastContainer"></div>
 
   <script>
+// =============================================================================
+// QR CODE GENERATOR (Zero Dependencies)
+// =============================================================================
+
+/**
+ * Pure JavaScript QR Code Generator
+ * Implements QR Code Model 2, versions 1-40, error correction levels L/M/Q/H
+ * Uses byte mode encoding for maximum compatibility with URLs
+ */
+class QRCodeGenerator {
+  // Error correction level constants
+  static EC_LOW = 0;      // ~7% recovery
+  static EC_MEDIUM = 1;   // ~15% recovery
+  static EC_QUARTILE = 2; // ~25% recovery
+  static EC_HIGH = 3;     // ~30% recovery
+
+  // Capacity table: [version][ecLevel] = max bytes
+  static CAPACITY = [
+    null, // version 0 doesn't exist
+    [17, 14, 11, 7], [32, 26, 20, 14], [53, 42, 32, 24], [78, 62, 46, 34],
+    [106, 84, 60, 44], [134, 106, 74, 58], [154, 122, 86, 64], [192, 152, 108, 84],
+    [230, 180, 130, 98], [271, 213, 151, 119], [321, 251, 177, 137], [367, 287, 203, 155],
+    [425, 331, 241, 177], [458, 362, 258, 194], [520, 412, 292, 220], [586, 450, 322, 250],
+    [644, 504, 364, 280], [718, 560, 394, 310], [792, 624, 442, 338], [858, 666, 482, 382],
+    [929, 711, 509, 403], [1003, 779, 565, 439], [1091, 857, 611, 461], [1171, 911, 661, 511],
+    [1273, 997, 715, 535], [1367, 1059, 751, 593], [1465, 1125, 805, 625], [1528, 1190, 868, 658],
+    [1628, 1264, 908, 698], [1732, 1370, 982, 742], [1840, 1452, 1030, 790], [1952, 1538, 1112, 842],
+    [2068, 1628, 1168, 898], [2188, 1722, 1228, 958], [2303, 1809, 1283, 983], [2431, 1911, 1351, 1051],
+    [2563, 1989, 1423, 1093], [2699, 2099, 1499, 1139], [2809, 2213, 1579, 1219], [2953, 2331, 1663, 1273]
+  ];
+
+  // Number of error correction codewords per block
+  static EC_CODEWORDS_PER_BLOCK = [
+    null,
+    [7, 10, 13, 17], [10, 16, 22, 28], [15, 26, 36, 44], [20, 36, 52, 64],
+    [26, 48, 72, 88], [36, 64, 96, 112], [40, 72, 108, 130], [48, 88, 132, 156],
+    [60, 110, 160, 192], [72, 130, 192, 224], [80, 150, 224, 264], [96, 176, 260, 308],
+    [104, 198, 288, 352], [120, 216, 320, 384], [132, 240, 360, 432], [144, 280, 408, 480],
+    [168, 308, 448, 532], [180, 338, 504, 588], [196, 364, 546, 650], [224, 416, 600, 700],
+    [224, 442, 644, 750], [252, 476, 690, 816], [270, 504, 750, 900], [300, 560, 810, 960],
+    [312, 588, 870, 1050], [336, 644, 952, 1110], [360, 700, 1020, 1200], [390, 728, 1050, 1260],
+    [420, 784, 1140, 1350], [450, 812, 1200, 1440], [480, 868, 1290, 1530], [510, 924, 1350, 1620],
+    [540, 980, 1440, 1710], [570, 1036, 1530, 1800], [570, 1064, 1590, 1890], [600, 1120, 1680, 1980],
+    [630, 1204, 1770, 2100], [660, 1260, 1860, 2220], [720, 1316, 1950, 2310], [750, 1372, 2040, 2430]
+  ];
+
+  // Number of blocks for each version and EC level
+  static NUM_BLOCKS = [
+    null,
+    [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 2, 2], [1, 2, 2, 4],
+    [1, 2, 4, 4], [2, 4, 4, 4], [2, 4, 6, 5], [2, 4, 6, 6],
+    [2, 5, 8, 8], [4, 5, 8, 8], [4, 5, 8, 11], [4, 8, 10, 11],
+    [4, 9, 12, 16], [4, 9, 16, 16], [6, 10, 12, 18], [6, 10, 17, 16],
+    [6, 11, 16, 19], [6, 13, 18, 21], [7, 14, 21, 25], [8, 16, 20, 25],
+    [8, 17, 23, 25], [9, 17, 23, 34], [9, 18, 25, 30], [10, 20, 27, 32],
+    [12, 21, 29, 35], [12, 23, 34, 37], [12, 25, 34, 40], [13, 26, 35, 42],
+    [14, 28, 38, 45], [15, 29, 40, 48], [16, 31, 43, 51], [17, 33, 45, 54],
+    [18, 35, 48, 57], [19, 37, 51, 60], [19, 38, 53, 63], [20, 40, 56, 66],
+    [21, 43, 59, 70], [22, 45, 62, 74], [24, 47, 65, 77], [25, 49, 68, 81]
+  ];
+
+  // Alignment pattern positions for each version
+  static ALIGNMENT_PATTERNS = [
+    null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34],
+    [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50], [6, 30, 54], [6, 32, 58],
+    [6, 34, 62], [6, 26, 46, 66], [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78],
+    [6, 30, 56, 82], [6, 30, 58, 86], [6, 34, 62, 90], [6, 28, 50, 72, 94],
+    [6, 26, 50, 74, 98], [6, 30, 54, 78, 102], [6, 28, 54, 80, 106], [6, 32, 58, 84, 110],
+    [6, 30, 58, 86, 114], [6, 34, 62, 90, 118], [6, 26, 50, 74, 98, 122],
+    [6, 30, 54, 78, 102, 126], [6, 26, 52, 78, 104, 130], [6, 30, 56, 82, 108, 134],
+    [6, 34, 60, 86, 112, 138], [6, 30, 58, 86, 114, 142], [6, 34, 62, 90, 118, 146],
+    [6, 30, 54, 78, 102, 126, 150], [6, 24, 50, 76, 102, 128, 154],
+    [6, 28, 54, 80, 106, 132, 158], [6, 32, 58, 84, 110, 136, 162],
+    [6, 26, 54, 82, 110, 138, 166], [6, 30, 58, 86, 114, 142, 170]
+  ];
+
+  // Generator polynomials for Reed-Solomon (coefficients as exponents in GF(2^8))
+  static GF_EXP = new Uint8Array(512);
+  static GF_LOG = new Uint8Array(256);
+  static {
+    // Initialize Galois Field lookup tables
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+      QRCodeGenerator.GF_EXP[i] = x;
+      QRCodeGenerator.GF_LOG[x] = i;
+      x = x << 1;
+      if (x >= 256) x ^= 0x11d; // primitive polynomial
+    }
+    for (let i = 255; i < 512; i++) {
+      QRCodeGenerator.GF_EXP[i] = QRCodeGenerator.GF_EXP[i - 255];
+    }
+  }
+
+  constructor() {
+    this.modules = null;
+    this.size = 0;
+    this.version = 0;
+  }
+
+  /**
+   * Generate QR code for given text
+   * @param {string} text - Text to encode
+   * @param {number} ecLevel - Error correction level (0-3)
+   * @returns {object} - {modules: 2D array, size: number, version: number} or null if too large
+   */
+  generate(text, ecLevel = QRCodeGenerator.EC_LOW) {
+    // Convert text to bytes
+    const data = new TextEncoder().encode(text);
+
+    // Find minimum version that can hold this data
+    this.version = this.getMinVersion(data.length, ecLevel);
+    if (this.version === 0) return null; // Data too large
+
+    // Calculate module size
+    this.size = 17 + this.version * 4;
+
+    // Initialize modules array (null = not yet set)
+    this.modules = [];
+    for (let i = 0; i < this.size; i++) {
+      this.modules[i] = new Array(this.size).fill(null);
+    }
+
+    // Place finder patterns
+    this.placeFinderPattern(0, 0);
+    this.placeFinderPattern(this.size - 7, 0);
+    this.placeFinderPattern(0, this.size - 7);
+
+    // Place alignment patterns
+    this.placeAlignmentPatterns();
+
+    // Place timing patterns
+    this.placeTimingPatterns();
+
+    // Reserve format and version info areas
+    this.reserveFormatArea();
+    if (this.version >= 7) {
+      this.reserveVersionArea();
+    }
+
+    // Encode data
+    const encoded = this.encodeData(data, ecLevel);
+
+    // Place data modules
+    this.placeDataModules(encoded);
+
+    // Apply best mask
+    const maskPattern = this.applyBestMask(ecLevel);
+
+    // Place format info
+    this.placeFormatInfo(ecLevel, maskPattern);
+
+    // Place version info for version 7+
+    if (this.version >= 7) {
+      this.placeVersionInfo();
+    }
+
+    return {
+      modules: this.modules,
+      size: this.size,
+      version: this.version
+    };
+  }
+
+  getMinVersion(dataBytes, ecLevel) {
+    for (let v = 1; v <= 40; v++) {
+      if (QRCodeGenerator.CAPACITY[v][ecLevel] >= dataBytes) {
+        return v;
+      }
+    }
+    return 0; // Data too large
+  }
+
+  placeFinderPattern(row, col) {
+    for (let r = -1; r <= 7; r++) {
+      for (let c = -1; c <= 7; c++) {
+        const rr = row + r;
+        const cc = col + c;
+        if (rr < 0 || rr >= this.size || cc < 0 || cc >= this.size) continue;
+
+        let dark = false;
+        if (r >= 0 && r <= 6 && (c === 0 || c === 6)) dark = true;
+        else if (c >= 0 && c <= 6 && (r === 0 || r === 6)) dark = true;
+        else if (r >= 2 && r <= 4 && c >= 2 && c <= 4) dark = true;
+
+        this.modules[rr][cc] = dark;
+      }
+    }
+  }
+
+  placeAlignmentPatterns() {
+    const positions = QRCodeGenerator.ALIGNMENT_PATTERNS[this.version];
+    if (!positions || positions.length === 0) return;
+
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = 0; j < positions.length; j++) {
+        const row = positions[i];
+        const col = positions[j];
+
+        // Skip if overlaps with finder patterns
+        if (this.modules[row][col] !== null) continue;
+
+        for (let r = -2; r <= 2; r++) {
+          for (let c = -2; c <= 2; c++) {
+            const rr = row + r;
+            const cc = col + c;
+            if (rr < 0 || rr >= this.size || cc < 0 || cc >= this.size) continue;
+
+            let dark = (r === -2 || r === 2 || c === -2 || c === 2 || (r === 0 && c === 0));
+            this.modules[rr][cc] = dark;
+          }
+        }
+      }
+    }
+  }
+
+  placeTimingPatterns() {
+    for (let i = 8; i < this.size - 8; i++) {
+      const dark = (i % 2 === 0);
+      if (this.modules[6][i] === null) this.modules[6][i] = dark;
+      if (this.modules[i][6] === null) this.modules[i][6] = dark;
+    }
+  }
+
+  reserveFormatArea() {
+    // Around top-left finder
+    for (let i = 0; i < 9; i++) {
+      if (this.modules[8][i] === null) this.modules[8][i] = false;
+      if (this.modules[i][8] === null) this.modules[i][8] = false;
+    }
+    // Around bottom-left and top-right finders
+    for (let i = 0; i < 8; i++) {
+      if (this.modules[this.size - 1 - i][8] === null) this.modules[this.size - 1 - i][8] = false;
+      if (this.modules[8][this.size - 1 - i] === null) this.modules[8][this.size - 1 - i] = false;
+    }
+    // Dark module
+    this.modules[this.size - 8][8] = true;
+  }
+
+  reserveVersionArea() {
+    for (let i = 0; i < 6; i++) {
+      for (let j = 0; j < 3; j++) {
+        this.modules[i][this.size - 11 + j] = false;
+        this.modules[this.size - 11 + j][i] = false;
+      }
+    }
+  }
+
+  encodeData(data, ecLevel) {
+    const version = this.version;
+    const totalCodewords = this.getTotalCodewords();
+    const ecCodewords = QRCodeGenerator.EC_CODEWORDS_PER_BLOCK[version][ecLevel];
+    const numBlocks = QRCodeGenerator.NUM_BLOCKS[version][ecLevel];
+    const totalDataCodewords = totalCodewords - ecCodewords * numBlocks;
+
+    // Build data codewords
+    const bits = [];
+
+    // Mode indicator (byte mode = 0100)
+    bits.push(0, 1, 0, 0);
+
+    // Character count
+    const countBits = version <= 9 ? 8 : 16;
+    for (let i = countBits - 1; i >= 0; i--) {
+      bits.push((data.length >> i) & 1);
+    }
+
+    // Data
+    for (let i = 0; i < data.length; i++) {
+      for (let j = 7; j >= 0; j--) {
+        bits.push((data[i] >> j) & 1);
+      }
+    }
+
+    // Terminator (up to 4 zeros)
+    const termLen = Math.min(4, totalDataCodewords * 8 - bits.length);
+    for (let i = 0; i < termLen; i++) bits.push(0);
+
+    // Pad to byte boundary
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    // Pad to capacity
+    let padByte = 0xEC;
+    while (bits.length < totalDataCodewords * 8) {
+      for (let i = 7; i >= 0; i--) {
+        bits.push((padByte >> i) & 1);
+      }
+      padByte = padByte === 0xEC ? 0x11 : 0xEC;
+    }
+
+    // Convert to bytes
+    const dataCodewords = new Uint8Array(totalDataCodewords);
+    for (let i = 0; i < totalDataCodewords; i++) {
+      let byte = 0;
+      for (let j = 0; j < 8; j++) {
+        byte = (byte << 1) | bits[i * 8 + j];
+      }
+      dataCodewords[i] = byte;
+    }
+
+    // Split into blocks
+    const shortBlockLen = Math.floor(totalDataCodewords / numBlocks);
+    const longBlocks = totalDataCodewords % numBlocks;
+    const blocks = [];
+    let offset = 0;
+
+    for (let i = 0; i < numBlocks; i++) {
+      const blockLen = shortBlockLen + (i >= numBlocks - longBlocks ? 1 : 0);
+      blocks.push(dataCodewords.slice(offset, offset + blockLen));
+      offset += blockLen;
+    }
+
+    // Generate error correction for each block
+    const ecBlocks = [];
+    for (let i = 0; i < numBlocks; i++) {
+      ecBlocks.push(this.generateECC(blocks[i], ecCodewords));
+    }
+
+    // Interleave data and EC codewords
+    const result = [];
+    const maxBlockLen = shortBlockLen + 1;
+
+    for (let i = 0; i < maxBlockLen; i++) {
+      for (let j = 0; j < numBlocks; j++) {
+        if (i < blocks[j].length) {
+          result.push(blocks[j][i]);
+        }
+      }
+    }
+
+    for (let i = 0; i < ecCodewords; i++) {
+      for (let j = 0; j < numBlocks; j++) {
+        result.push(ecBlocks[j][i]);
+      }
+    }
+
+    // Convert to bit array
+    const resultBits = [];
+    for (let i = 0; i < result.length; i++) {
+      for (let j = 7; j >= 0; j--) {
+        resultBits.push((result[i] >> j) & 1);
+      }
+    }
+
+    return resultBits;
+  }
+
+  getTotalCodewords() {
+    const size = this.size;
+    let total = size * size;
+
+    // Subtract finder patterns (3 x 8x8 including separators)
+    total -= 3 * 64;
+
+    // Subtract timing patterns (already partially subtracted)
+    total -= (size - 16);
+
+    // Subtract format info (15 bits x 2, but with overlap)
+    total -= 31;
+
+    // Version info for v7+
+    if (this.version >= 7) {
+      total -= 36;
+    }
+
+    // Subtract alignment patterns
+    const alignPos = QRCodeGenerator.ALIGNMENT_PATTERNS[this.version];
+    if (alignPos && alignPos.length > 0) {
+      let alignCount = alignPos.length * alignPos.length;
+      // Subtract overlaps with finder patterns
+      alignCount -= 3;
+      total -= alignCount * 25;
+    }
+
+    return Math.floor(total / 8);
+  }
+
+  generateECC(data, ecCodewords) {
+    // Generate Reed-Solomon error correction codewords
+    const gen = this.getGeneratorPolynomial(ecCodewords);
+    const result = new Uint8Array(ecCodewords);
+    const work = new Uint8Array(data.length + ecCodewords);
+    work.set(data);
+
+    for (let i = 0; i < data.length; i++) {
+      const coef = work[i];
+      if (coef !== 0) {
+        const logCoef = QRCodeGenerator.GF_LOG[coef];
+        for (let j = 0; j < gen.length; j++) {
+          work[i + j] ^= QRCodeGenerator.GF_EXP[(logCoef + gen[j]) % 255];
+        }
+      }
+    }
+
+    for (let i = 0; i < ecCodewords; i++) {
+      result[i] = work[data.length + i];
+    }
+
+    return result;
+  }
+
+  getGeneratorPolynomial(degree) {
+    // Cache generator polynomials
+    if (!QRCodeGenerator._genCache) QRCodeGenerator._genCache = {};
+    if (QRCodeGenerator._genCache[degree]) return QRCodeGenerator._genCache[degree];
+
+    let gen = [0]; // Start with x^0
+    for (let i = 0; i < degree; i++) {
+      const newGen = new Uint8Array(gen.length + 1);
+      for (let j = 0; j < gen.length; j++) {
+        newGen[j] = (newGen[j] + gen[j]) % 255;
+        newGen[j + 1] = (gen[j] + i) % 255;
+      }
+      gen = newGen;
+    }
+
+    QRCodeGenerator._genCache[degree] = gen;
+    return gen;
+  }
+
+  placeDataModules(bits) {
+    let bitIdx = 0;
+    let upward = true;
+
+    for (let col = this.size - 1; col >= 0; col -= 2) {
+      if (col === 6) col = 5; // Skip timing pattern column
+
+      for (let row = 0; row < this.size; row++) {
+        const actualRow = upward ? this.size - 1 - row : row;
+
+        for (let c = 0; c < 2; c++) {
+          const actualCol = col - c;
+          if (actualCol < 0) continue;
+          if (this.modules[actualRow][actualCol] !== null) continue;
+
+          const dark = bitIdx < bits.length ? bits[bitIdx] === 1 : false;
+          this.modules[actualRow][actualCol] = dark;
+          bitIdx++;
+        }
+      }
+
+      upward = !upward;
+    }
+  }
+
+  applyBestMask(ecLevel) {
+    let bestMask = 0;
+    let bestPenalty = Infinity;
+
+    for (let mask = 0; mask < 8; mask++) {
+      // Apply mask
+      this.applyMask(mask);
+
+      // Calculate penalty
+      const penalty = this.calculatePenalty();
+
+      // Undo mask
+      this.applyMask(mask);
+
+      if (penalty < bestPenalty) {
+        bestPenalty = penalty;
+        bestMask = mask;
+      }
+    }
+
+    // Apply best mask permanently
+    this.applyMask(bestMask);
+    return bestMask;
+  }
+
+  applyMask(mask) {
+    for (let row = 0; row < this.size; row++) {
+      for (let col = 0; col < this.size; col++) {
+        if (!this.isDataModule(row, col)) continue;
+
+        let invert = false;
+        switch (mask) {
+          case 0: invert = (row + col) % 2 === 0; break;
+          case 1: invert = row % 2 === 0; break;
+          case 2: invert = col % 3 === 0; break;
+          case 3: invert = (row + col) % 3 === 0; break;
+          case 4: invert = (Math.floor(row / 2) + Math.floor(col / 3)) % 2 === 0; break;
+          case 5: invert = (row * col) % 2 + (row * col) % 3 === 0; break;
+          case 6: invert = ((row * col) % 2 + (row * col) % 3) % 2 === 0; break;
+          case 7: invert = ((row + col) % 2 + (row * col) % 3) % 2 === 0; break;
+        }
+
+        if (invert) {
+          this.modules[row][col] = !this.modules[row][col];
+        }
+      }
+    }
+  }
+
+  isDataModule(row, col) {
+    // Check if this is a function pattern area
+    // Finder patterns
+    if (row < 9 && col < 9) return false;
+    if (row < 9 && col >= this.size - 8) return false;
+    if (row >= this.size - 8 && col < 9) return false;
+
+    // Timing patterns
+    if (row === 6 || col === 6) return false;
+
+    // Alignment patterns (simplified check)
+    const alignPos = QRCodeGenerator.ALIGNMENT_PATTERNS[this.version];
+    if (alignPos) {
+      for (let i = 0; i < alignPos.length; i++) {
+        for (let j = 0; j < alignPos.length; j++) {
+          const ar = alignPos[i];
+          const ac = alignPos[j];
+          if (Math.abs(row - ar) <= 2 && Math.abs(col - ac) <= 2) {
+            // Check if this alignment pattern overlaps with finder patterns
+            if ((ar < 9 && ac < 9) || (ar < 9 && ac >= this.size - 8) ||
+                (ar >= this.size - 8 && ac < 9)) continue;
+            return false;
+          }
+        }
+      }
+    }
+
+    // Version info (v7+)
+    if (this.version >= 7) {
+      if (row < 6 && col >= this.size - 11) return false;
+      if (col < 6 && row >= this.size - 11) return false;
+    }
+
+    return true;
+  }
+
+  calculatePenalty() {
+    let penalty = 0;
+
+    // Rule 1: Consecutive same-color modules
+    for (let row = 0; row < this.size; row++) {
+      let count = 1;
+      for (let col = 1; col < this.size; col++) {
+        if (this.modules[row][col] === this.modules[row][col - 1]) {
+          count++;
+        } else {
+          if (count >= 5) penalty += 3 + (count - 5);
+          count = 1;
+        }
+      }
+      if (count >= 5) penalty += 3 + (count - 5);
+    }
+
+    for (let col = 0; col < this.size; col++) {
+      let count = 1;
+      for (let row = 1; row < this.size; row++) {
+        if (this.modules[row][col] === this.modules[row - 1][col]) {
+          count++;
+        } else {
+          if (count >= 5) penalty += 3 + (count - 5);
+          count = 1;
+        }
+      }
+      if (count >= 5) penalty += 3 + (count - 5);
+    }
+
+    // Rule 2: 2x2 blocks of same color
+    for (let row = 0; row < this.size - 1; row++) {
+      for (let col = 0; col < this.size - 1; col++) {
+        const color = this.modules[row][col];
+        if (color === this.modules[row][col + 1] &&
+            color === this.modules[row + 1][col] &&
+            color === this.modules[row + 1][col + 1]) {
+          penalty += 3;
+        }
+      }
+    }
+
+    // Rule 3: Finder-like patterns (simplified)
+    const pattern1 = [true, false, true, true, true, false, true, false, false, false, false];
+    const pattern2 = [false, false, false, false, true, false, true, true, true, false, true];
+
+    for (let row = 0; row < this.size; row++) {
+      for (let col = 0; col < this.size - 10; col++) {
+        let match1 = true, match2 = true;
+        for (let i = 0; i < 11; i++) {
+          if (this.modules[row][col + i] !== pattern1[i]) match1 = false;
+          if (this.modules[row][col + i] !== pattern2[i]) match2 = false;
+        }
+        if (match1 || match2) penalty += 40;
+      }
+    }
+
+    for (let col = 0; col < this.size; col++) {
+      for (let row = 0; row < this.size - 10; row++) {
+        let match1 = true, match2 = true;
+        for (let i = 0; i < 11; i++) {
+          if (this.modules[row + i][col] !== pattern1[i]) match1 = false;
+          if (this.modules[row + i][col] !== pattern2[i]) match2 = false;
+        }
+        if (match1 || match2) penalty += 40;
+      }
+    }
+
+    // Rule 4: Balance
+    let dark = 0;
+    for (let row = 0; row < this.size; row++) {
+      for (let col = 0; col < this.size; col++) {
+        if (this.modules[row][col]) dark++;
+      }
+    }
+    const total = this.size * this.size;
+    const percent = dark * 100 / total;
+    const deviation = Math.abs(percent - 50);
+    penalty += Math.floor(deviation / 5) * 10;
+
+    return penalty;
+  }
+
+  placeFormatInfo(ecLevel, maskPattern) {
+    const FORMAT_BITS = [
+      0x5412, 0x5125, 0x5E7C, 0x5B4B, 0x45F9, 0x40CE, 0x4F97, 0x4AA0,
+      0x77C4, 0x72F3, 0x7DAA, 0x789D, 0x662F, 0x6318, 0x6C41, 0x6976,
+      0x1689, 0x13BE, 0x1CE7, 0x19D0, 0x0762, 0x0255, 0x0D0C, 0x083B,
+      0x355F, 0x3068, 0x3F31, 0x3A06, 0x24B4, 0x2183, 0x2EDA, 0x2BED
+    ];
+
+    const formatInfo = FORMAT_BITS[ecLevel * 8 + maskPattern];
+
+    // Place format bits around top-left finder
+    for (let i = 0; i < 6; i++) {
+      this.modules[8][i] = ((formatInfo >> i) & 1) === 1;
+      this.modules[i][8] = ((formatInfo >> (14 - i)) & 1) === 1;
+    }
+    this.modules[8][7] = ((formatInfo >> 6) & 1) === 1;
+    this.modules[8][8] = ((formatInfo >> 7) & 1) === 1;
+    this.modules[7][8] = ((formatInfo >> 8) & 1) === 1;
+
+    // Place format bits around other finders
+    for (let i = 0; i < 8; i++) {
+      this.modules[this.size - 1 - i][8] = ((formatInfo >> i) & 1) === 1;
+      this.modules[8][this.size - 8 + i] = ((formatInfo >> (14 - i)) & 1) === 1;
+    }
+  }
+
+  placeVersionInfo() {
+    const VERSION_BITS = [
+      null, null, null, null, null, null, null,
+      0x07C94, 0x085BC, 0x09A99, 0x0A4D3, 0x0BBF6, 0x0C762, 0x0D847, 0x0E60D,
+      0x0F928, 0x10B78, 0x1145D, 0x12A17, 0x13532, 0x149A6, 0x15683, 0x168C9,
+      0x177EC, 0x18EC4, 0x191E1, 0x1AFAB, 0x1B08E, 0x1CC1A, 0x1D33F, 0x1ED75,
+      0x1F250, 0x209D5, 0x216F0, 0x228BA, 0x2379F, 0x24B0B, 0x2542E, 0x26A64,
+      0x27541, 0x28C69
+    ];
+
+    const versionInfo = VERSION_BITS[this.version];
+    if (!versionInfo) return;
+
+    for (let i = 0; i < 18; i++) {
+      const bit = ((versionInfo >> i) & 1) === 1;
+      const row = Math.floor(i / 3);
+      const col = i % 3;
+      this.modules[row][this.size - 11 + col] = bit;
+      this.modules[this.size - 11 + col][row] = bit;
+    }
+  }
+
+  /**
+   * Render QR code to a canvas element
+   * @param {HTMLCanvasElement} canvas - Canvas element to draw on
+   * @param {object} qr - QR code data from generate()
+   * @param {object} options - Rendering options
+   */
+  static renderToCanvas(canvas, qr, options = {}) {
+    const {
+      moduleSize = 4,
+      margin = 4,
+      darkColor = '#000000',
+      lightColor = '#FFFFFF'
+    } = options;
+
+    const totalSize = (qr.size + margin * 2) * moduleSize;
+    canvas.width = totalSize;
+    canvas.height = totalSize;
+
+    const ctx = canvas.getContext('2d');
+
+    // Fill background
+    ctx.fillStyle = lightColor;
+    ctx.fillRect(0, 0, totalSize, totalSize);
+
+    // Draw modules
+    ctx.fillStyle = darkColor;
+    for (let row = 0; row < qr.size; row++) {
+      for (let col = 0; col < qr.size; col++) {
+        if (qr.modules[row][col]) {
+          ctx.fillRect(
+            (col + margin) * moduleSize,
+            (row + margin) * moduleSize,
+            moduleSize,
+            moduleSize
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Get maximum byte capacity for a given error correction level
+   * @param {number} ecLevel - Error correction level (0-3)
+   * @returns {number} - Maximum bytes that can be encoded
+   */
+  static getMaxCapacity(ecLevel = QRCodeGenerator.EC_LOW) {
+    return QRCodeGenerator.CAPACITY[40][ecLevel];
+  }
+}
+
 // =============================================================================
 // PHASE 1 UTILITY IMPROVEMENTS
 // =============================================================================
@@ -5837,6 +6561,7 @@ class FamilyTreeApp {
     document.getElementById('copyUrl').addEventListener('click', () => this.copyUrl());
     document.getElementById('openUrlBtn').addEventListener('click', () => this.openGeneratedUrl());
     document.getElementById('downloadCapsuleBtn').addEventListener('click', () => this.downloadCapsule());
+    document.getElementById('saveQrCodeBtn').addEventListener('click', () => this.saveQRCodeAsImage());
     document.getElementById('closeExportModal').addEventListener('click', () => this.closeModal('exportModal'));
     document.getElementById('closeAddModal').addEventListener('click', () => this.closeModal('addPersonModal'));
     document.getElementById('saveNewPerson').addEventListener('click', () => this.saveNewPerson());
@@ -7032,6 +7757,9 @@ class FamilyTreeApp {
     document.getElementById('urlCloseOnly').style.display = 'flex';
     document.getElementById('generateUrlBtn').style.display = 'block';
 
+    // Reset QR code section
+    document.getElementById('qrCodeSection').style.display = 'none';
+
     // Reset radio to Pure HTML (default) on modal open
     const pureRadio = document.getElementById('urlModeMax');
     if (pureRadio) pureRadio.checked = true;
@@ -7350,9 +8078,105 @@ class FamilyTreeApp {
       document.getElementById('generateUrlBtn').style.display = 'none';
       document.getElementById('urlButtons').style.display = 'flex';
       document.getElementById('urlCloseOnly').style.display = 'none';
+
+      // Generate QR code
+      this.generateQRCode(url);
     } catch (e) {
       console.error(e);
       this.toast('Error generating URL: ' + e.message);
+    }
+  }
+
+  /**
+   * Generate and render QR code for the given URL
+   * @param {string} url - The URL to encode in the QR code
+   */
+  generateQRCode(url) {
+    const qrSection = document.getElementById('qrCodeSection');
+    const qrCanvas = document.getElementById('qrCodeCanvas');
+    const qrInfo = document.getElementById('qrCodeInfo');
+    const qrWarning = document.getElementById('qrCodeWarning');
+    const saveBtn = document.getElementById('saveQrCodeBtn');
+
+    // Check if URL is too large for QR code
+    // QR code version 40 with EC level L can hold ~2953 bytes
+    const maxCapacity = QRCodeGenerator.getMaxCapacity(QRCodeGenerator.EC_LOW);
+    const urlBytes = new TextEncoder().encode(url).length;
+
+    if (urlBytes > maxCapacity) {
+      // URL too large for QR code
+      qrSection.style.display = 'block';
+      qrCanvas.style.display = 'none';
+      qrInfo.textContent = '';
+      qrWarning.style.display = 'block';
+      qrWarning.innerHTML = `⚠️ URL too large for QR code (${(urlBytes / 1024).toFixed(1)} KB). Maximum QR code capacity is ~${(maxCapacity / 1024).toFixed(1)} KB. Consider using a URL shortener or the "Download HTML" option.`;
+      saveBtn.style.display = 'none';
+      return;
+    }
+
+    try {
+      // Generate QR code
+      const qrGenerator = new QRCodeGenerator();
+      const qr = qrGenerator.generate(url, QRCodeGenerator.EC_LOW);
+
+      if (!qr) {
+        throw new Error('Failed to generate QR code');
+      }
+
+      // Render to canvas
+      // Calculate optimal module size based on QR version
+      // Larger QR codes need smaller modules to fit reasonably
+      let moduleSize = 4;
+      if (qr.version > 20) moduleSize = 2;
+      else if (qr.version > 10) moduleSize = 3;
+
+      QRCodeGenerator.renderToCanvas(qrCanvas, qr, {
+        moduleSize: moduleSize,
+        margin: 4,
+        darkColor: '#2d2a26',
+        lightColor: '#FFFFFF'
+      });
+
+      // Show QR section
+      qrSection.style.display = 'block';
+      qrCanvas.style.display = 'block';
+      qrInfo.textContent = `Version ${qr.version} • ${qr.size}×${qr.size} modules • ${urlBytes} bytes`;
+      qrWarning.style.display = 'none';
+      saveBtn.style.display = 'inline-block';
+
+      // Store reference for saving
+      this._qrCanvas = qrCanvas;
+
+    } catch (e) {
+      console.error('QR code generation error:', e);
+      qrSection.style.display = 'block';
+      qrCanvas.style.display = 'none';
+      qrInfo.textContent = '';
+      qrWarning.style.display = 'block';
+      qrWarning.textContent = 'Error generating QR code: ' + e.message;
+      saveBtn.style.display = 'none';
+    }
+  }
+
+  /**
+   * Save the QR code as a PNG image
+   */
+  saveQRCodeAsImage() {
+    if (!this._qrCanvas) {
+      this.toast('No QR code to save');
+      return;
+    }
+
+    try {
+      // Create a link element
+      const link = document.createElement('a');
+      link.download = 'family-tree-qrcode.png';
+      link.href = this._qrCanvas.toDataURL('image/png');
+      link.click();
+      this.toast('QR code saved');
+    } catch (e) {
+      console.error('Error saving QR code:', e);
+      this.toast('Error saving QR code: ' + e.message);
     }
   }
 
